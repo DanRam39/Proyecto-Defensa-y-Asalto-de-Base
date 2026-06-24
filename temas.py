@@ -24,3 +24,15 @@ TEMAS = {
         "fondo": "#F0FFF0"
     }
 }
+
+# Esta funcion busca el tema que el usuario quiere 
+def obtener_tema(nombre):
+    return TEMAS.get(nombre, TEMAS["Medieval"]) #utiliza uno predeterminado en caso de que no se seleccione ninguno
+
+# Retorna la lista de nombres de facciones disponibles
+def listar_temas():
+    return list(TEMAS.keys())
+
+# Valida que el atacante y defensor no elijan lo mismo 
+def validar_facciones(faccion_defensor, faccion_atacante):
+    return faccion_defensor != faccion_atacante #verificación 
