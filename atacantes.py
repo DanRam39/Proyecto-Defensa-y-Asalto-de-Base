@@ -5,7 +5,8 @@ class Unidad:
     def __init__(self, nombre, costo, vida, daño, velocidad):
         self.nombre = nombre
         self.costo = costo
-        self.vida = vida
+        self.vida_maxima = vida
+        self.vida_actual = vida
         self.daño = daño
         self.velocidad = velocidad
         self.turno_habilidad = 3  # la habilidad se activa cada 3 turnos
@@ -14,9 +15,8 @@ class Unidad:
 
 #tiene la función de restar vida y si llega a 0 se muere 
     def recibir_daño(self, cantidad):
-        self.vida -= cantidad
-        if self.vida <= 0:
-            self.vida = 0
+        self.vida_actual = max(0, self.vida_actual - cantidad)
+        if self.vida_actual <= 0:
             self.viva = False
 
 #lo que hace es mover la unidad a la izquierda restando columnas según la velocidad. 
@@ -35,6 +35,7 @@ class Unidad:
             return self.activar_habilidad()
         return None
 
+
 #creación del soldado con sus características
 class Soldado(Unidad):
     def __init__(self):
@@ -50,6 +51,7 @@ class Soldado(Unidad):
     def activar_habilidad(self):
         self.daño *= 2 
         return f"{self.nombre} activa Ataque Doble: daño duplicado este turno."
+
 
 #creación del tanque 
 class Tanque(Unidad):
@@ -74,6 +76,7 @@ class Tanque(Unidad):
             self.escudo_activo = False
             return  # ignora el daño
         super().recibir_daño(cantidad)
+
 
 #esta unidad es muy rápida pero tiene muy poca vida 
 class Rapida(Unidad):
