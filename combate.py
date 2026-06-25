@@ -1,8 +1,9 @@
 #aquí se trabaja la lógica del combate 
 
 from defensa import Base , Torre 
-
+torres_en_juego = [] #guarda cada torre puesta en el mapa junto con su fila y columna 
 #se creó esta nueva clase ya que hacia falta para que las unidades tengan algo contra que chocar al moverse
+
 class Muro:
     def __init__(self, vida, costo):
         self.costo = costo
@@ -76,3 +77,64 @@ def verificar_victoria_ronda(base, dinero_atacante, unidades_en_juego):
     if gano_defensor(base, dinero_atacante, unidades_en_juego):
         return "defensor"
     return None
+
+#DISPARO DE TORRES........................................
+
+def unidades_en_rango(fila_torre, columna_torre, alcance, unidades_en_juego):
+    en_rango = []
+    for ficha in unidades_en_juego:
+        unidad = ficha["unidad"]
+        if not unidad.viva:
+            continue  # si ya murió la ignora y pasa a la siguiente 
+        distancia = abs(fila_torre - ficha["fila"]) + abs(columna_torre - ficha["columna"]) #calcula cuantas casillas de distancia hay entre la torre y la unidad
+        if distancia <= alcance: #si la unidad está dentro del alcance la guarda enb la lista
+            en_rango.append(ficha)
+    return en_rango
+
+
+# De todas las unidades que están en rango, esta función elige la que
+# está más cerca de la torre, para saber a cuál le va a disparar.
+def ficha_mas_cercana(fila_torre, columna_torre, fichas):
+    mas_cercana = None #esta es para guardar le mejor opcion encontrada
+    distancia_minima = None
+    for ficha in fichas: # calcula de nuevo la distancia en casillas para esta unidad especifica
+        distancia = abs(fila_torre - ficha["fila"]) + abs(columna_torre - ficha["columna"])
+        if distancia_minima is None or distancia < distancia_minima: # si es la primera unidad que revisa o es la nueva más cercana actualiza el record de distancia
+            distancia_minima = distancia
+            mas_cercana = ficha
+    return mas_cercana
+
+
+# Esta es la función principal de esta parte. Se llama una vez cada turno
+# y hace que cada torre que esté viva ataque a la unidad enemiga más
+# cercana que tenga dentro de su alcance. Si a la torre le toca activar
+# su habilidad este turno, también la activa.
+def disparar_torres(torres_en_juego, unidades_en_juego):
+    for ficha_torre in torres_en_juego:
+        torre = ficha_torre["torre"]
+
+        if torre.esta_destruida():
+            continue  # una torre destruida no puede disparar
+
+        en_rango = unidades_en_rango(
+            ficha_torre["fila"], ficha_torre["columna"], torre.alcance, unidades_en_juego
+        )
+
+        if not en_rango:
+            continue  # no hay nadie cerca, no hace nada este turno
+
+        objetivo_ficha = ficha_mas_cercana(ficha_torre["fila"], ficha_torre["columna"], en_rango)
+        objetivo = objetivo_ficha["unidad"]
+
+        objetivo.recibir_daño(torre.daño)  # el disparo normal de cada turno
+
+        if torre.puede_activar_habilidad():
+            if torre.tipo == "pesada":
+                # La torre pesada con su habilidad le pega a todos los
+                # que estén en rango, no solo al más cercano
+                for ficha_en_rango in en_rango:
+                    torre.activar_habilidad(ficha_en_rango["unidad"])
+            else:
+                # La básica (dispara dos veces) y la mágica (congela)
+                # solo afectan a la unidad más cercana
+                torre.activar_habilidad(objetivo)
