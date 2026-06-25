@@ -207,3 +207,32 @@ def dinero_atacante_por_base(base, vida_base_antes):
     if base.vida_actual < vida_base_antes:
         return DINERO_POR_DAÑAR_TORRE_O_BASE
     return 0
+
+#turno completo.............
+# Esta función ejecuta un turno completo, llamando todo lo de arriba
+# en orden: primero disparan las torres, luego se mueven las unidades,
+# luego activan su habilidad si les toca, y al final se reparte el
+# dinero y se revisa si alguien ganó la ronda.
+def ejecutar_turno(tablero, base, torres_en_juego, unidades_en_juego, dinero_atacante_actual):
+    vida_base_antes = base.vida_actual
+    vidas_torres_antes = {id(ft["torre"]): ft["torre"].vida_actual for ft in torres_en_juego}
+
+    disparar_torres(torres_en_juego, unidades_en_juego)
+    mover_unidades(tablero, unidades_en_juego)
+    mensajes_habilidades = activar_habilidades_unidades(unidades_en_juego)
+
+    dinero_ganado_defensor = dinero_defensor_por_muertes(unidades_en_juego)
+    dinero_ganado_atacante = dinero_atacante_por_torres(torres_en_juego, vidas_torres_antes)
+    dinero_ganado_atacante += dinero_atacante_por_base(base, vida_base_antes)
+
+    # se suma lo que ya tenía el atacante con lo que ganó este turno,
+    # para saber si ya le alcanza para seguir jugando
+    dinero_atacante_total = dinero_atacante_actual + dinero_ganado_atacante
+    ganador_ronda = verificar_victoria_ronda(base, dinero_atacante_total, unidades_en_juego)
+
+    return {
+        "dinero_ganado_defensor": dinero_ganado_defensor,
+        "dinero_ganado_atacante": dinero_ganado_atacante,
+        "mensajes_habilidades": mensajes_habilidades,
+        "ganador_ronda": ganador_ronda,
+    }
