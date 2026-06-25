@@ -18,4 +18,4 @@ def top_defensores():
         key=lambda x: x[1]["victorias_defensor"], #busca el dato victorias
         reverse=True
     )
-    return ordenados[:5] #la lista se corta para dejar solamente los 5 mejores puntajes
+    return ordenados#la lista no se corta para que retorne todos los puntajes
