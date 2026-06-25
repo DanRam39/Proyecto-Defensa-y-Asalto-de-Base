@@ -12,12 +12,16 @@ class Unidad:
         self.turno_habilidad = 3  # la habilidad se activa cada 3 turnos
         self.turnos_jugados = 0
         self.viva = True
+        self.velocidad_congelada = False #es true cuando una torre mágica la congela, combate.py la revisq
 
 #tiene la función de restar vida y si llega a 0 se muere 
     def recibir_daño(self, cantidad):
         self.vida_actual = max(0, self.vida_actual - cantidad)
         if self.vida_actual <= 0:
             self.viva = False
+            
+    def descongelar(self):
+        self.velocidad_congelada = False
 
 #lo que hace es mover la unidad a la izquierda restando columnas según la velocidad. 
     def mover(self, fila, col):
