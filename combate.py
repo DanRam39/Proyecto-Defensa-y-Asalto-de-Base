@@ -138,3 +138,72 @@ def disparar_torres(torres_en_juego, unidades_en_juego):
                 # La básica (dispara dos veces) y la mágica (congela)
                 # solo afectan a la unidad más cercana
                 torre.activar_habilidad(objetivo)
+
+
+# Esta parte hace que las unidades activen su habilidad especial.
+# Unidad ya tiene un método que cuenta los turnos y la activa sola
+# cada 3 turnos (intentar_habilidad), pero nadie lo estaba llamando
+# todavía. Por eso, aunque el código de las habilidades ya existía,
+# nunca se estaban usando en el juego.
+def activar_habilidades_unidades(unidades_en_juego):
+    mensajes = []  # guarda lo que diga cada habilidad que se activó
+    for ficha in unidades_en_juego:  # revisa una por una todas las unidades en la partida
+        unidad = ficha["unidad"]  # saca la unidad de su ficha para trabajar con ella
+        if not unidad.viva:
+            continue  # si ya murió, no intenta nada
+        resultado = unidad.intentar_habilidad()  # la unidad decide sola si le toca usar su habilidad este turno
+        if resultado is not None:  # si se activó algo, la unidad devuelve un mensaje; si no, devuelve None
+            mensajes.append(resultado)
+    return mensajes  # al final devuelve todos los mensajes para mostrarlos en pantalla
+
+#Ganancia de dinero por daños.............................
+DINERO_POR_DAÑAR_TORRE_O_BASE = 5
+DINERO_EXTRA_POR_DESTRUIR_TORRE = 20
+
+
+# Esta función le da dinero al defensor por cada unidad enemiga que
+# haya muerto. La cantidad depende del tipo de unidad: le damos la
+# mitad de lo que costaba comprarla. También se encarga de sacar de
+# la lista a las unidades que ya murieron, para no cobrarlas dos veces
+# en un turno futuro.
+def dinero_defensor_por_muertes(unidades_en_juego):
+    dinero_ganado = 0
+    vivas = []
+    for ficha in unidades_en_juego:
+        unidad = ficha["unidad"]
+        if unidad.viva:
+            vivas.append(ficha)  # sigue viva, se queda en la lista
+        else:
+            dinero_ganado += unidad.costo // 2  # ya murió, se cobra y se deja afuera
+
+    unidades_en_juego[:] = vivas  # la lista original se actualiza solo con las que quedaron vivas
+    return dinero_ganado
+
+
+# Esta función le da dinero al atacante por dañar o destruir torres.
+# Para saber si una torre recibió daño este turno, comparamos su vida
+# de antes contra su vida de ahora. Por eso necesita el diccionario
+# vidas_antes, que hay que armar justo antes de mover unidades y
+# disparar torres, guardando cuánta vida tenía cada una en ese momento.
+def dinero_atacante_por_torres(torres_en_juego, vidas_antes):
+    dinero_ganado = 0
+    for ficha_torre in torres_en_juego:
+        torre = ficha_torre["torre"]
+        vida_anterior = vidas_antes.get(id(torre))
+        if vida_anterior is None:
+            continue  # si no se guardó su vida antes, no se cobra nada por seguridad
+
+        if torre.vida_actual < vida_anterior:
+            dinero_ganado += DINERO_POR_DAÑAR_TORRE_O_BASE  # le pegaron, gana dinero
+            if torre.esta_destruida():
+                dinero_ganado += DINERO_EXTRA_POR_DESTRUIR_TORRE  # además la destruyeron
+
+    return dinero_ganado
+
+
+# Misma idea que con las torres, pero para la base central.
+# vida_base_antes es la vida que tenía la base antes del turno.
+def dinero_atacante_por_base(base, vida_base_antes):
+    if base.vida_actual < vida_base_antes:
+        return DINERO_POR_DAÑAR_TORRE_O_BASE
+    return 0
