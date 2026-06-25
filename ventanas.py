@@ -89,8 +89,8 @@ class VentanaJuego:
         self.canvas.pack(pady=10)
 
         self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
-        fila_base, col_base = self.tablero.colocar_base(base)
-        self.visual.actualizar_celda(fila_base, col_base)
+        self.fila_base, self.columna_base = self.tablero.colocar_base(base)
+        self.visual.actualizar_celda(self.fila_base, self.columna_base)
 
         self.canvas.bind("<Button-1>", self.click_en_tablero)
 
@@ -272,7 +272,9 @@ class VentanaJuego:
             self.base,
             self.torres_en_juego,
             self.unidades_en_juego,
-            self.dinero_atacante_combate
+            self.dinero_atacante_combate,
+            self.fila_base,
+            self.columna_base
         )
 
         # Mostramos en el panel de texto lo que pasó este turno

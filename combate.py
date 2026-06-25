@@ -4,6 +4,8 @@ from defensa import Base , Torre
 torres_en_juego = [] #guarda cada torre puesta en el mapa junto con su fila y columna 
 #se creó esta nueva clase ya que hacia falta para que las unidades tengan algo contra que chocar al moverse
 
+from collections import deque
+
 class Muro:
     def __init__(self, vida, costo):
         self.costo = costo
@@ -25,35 +27,107 @@ def hay_obstaculo(tablero, fila, columna):
         return objeto
     return None
 
+from collections import deque
+
+def encontrar_siguiente_paso(tablero, fila_inicio, columna_inicio, fila_base, columna_base):
+    # Usamos BFS para encontrar el camino más corto desde la unidad hasta la base,
+    # evitando celdas ocupadas (torres, muros, otras unidades).
+    # Devuelve (fila, columna) del SIGUIENTE paso a dar, o None si no hay camino.
+
+    inicio = (fila_inicio, columna_inicio)
+    destino = (fila_base, columna_base)
+
+    if inicio == destino:
+        return None  # ya está en la base, no necesita moverse
+
+    cola = deque([inicio])          # celdas por explorar, en orden
+    visitadas = {inicio: None}      # cada celda apunta a "desde dónde llegamos aquí"
+
+    movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # arriba, abajo, izquierda, derecha
+
+    encontrado = False
+
+    while cola:
+        actual = cola.popleft()  # sacamos la celda más antigua de la cola
+
+        if actual == destino:
+            encontrado = True
+            break
+
+        fila_actual, columna_actual = actual
+
+        for delta_fila, delta_columna in movimientos:
+            vecina = (fila_actual + delta_fila, columna_actual + delta_columna)
+            fila_vecina, columna_vecina = vecina
+
+            if vecina in visitadas:
+                continue  # ya la habíamos visitado, no la repetimos
+
+            if not tablero.celda_valida(fila_vecina, columna_vecina):
+                continue  # se sale del tablero
+
+            objeto_en_vecina = tablero.obtener(fila_vecina, columna_vecina)
+            # La celda debe estar vacía, O ser la base misma (destino final)
+            if objeto_en_vecina is not None and vecina != destino:
+                continue  # está ocupada por algo, no se puede pasar por ahí
+
+            visitadas[vecina] = actual  # anotamos desde dónde llegamos
+            cola.append(vecina)
+
+    if not encontrado:
+        return None  # no hay ningún camino libre hasta la base
+
+    # Desandamos el camino desde la base hacia el inicio, para encontrar
+    # cuál fue el primer paso que dimos.
+    paso_actual = destino
+    while visitadas[paso_actual] != inicio:
+        paso_actual = visitadas[paso_actual]
+
+    return paso_actual
 
 # Esta es la principal: mueve a todas las unidades un turno, 
-def mover_unidades(tablero, unidades_en_juego):
-    for ficha in unidades_en_juego: #es una lista donde cada elemento guarda la unidad
+def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
+    for ficha in unidades_en_juego:
         unidad = ficha["unidad"]
 
         if not unidad.viva:
-            continue  # si ya murió, no hace nada
+            continue
 
         if unidad.velocidad_congelada:
-            unidad.descongelar()  # pierde este turno pero queda libre para el siguiente
+            unidad.descongelar()
             continue
 
         fila_actual = ficha["fila"]
         columna_actual = ficha["columna"]
-        fila_destino, columna_destino = unidad.mover(fila_actual, columna_actual)
 
-        obstaculo = hay_obstaculo(tablero, fila_destino, columna_destino)
+        # Repetimos el movimiento tantas veces como velocidad tenga la unidad
+        # (una Unidad Rápida con velocidad 2 se mueve 2 celdas en un turno)
+        for _ in range(unidad.velocidad):
+            if not unidad.viva:
+                break  # pudo haber muerto a mitad de su propio movimiento, poco probable pero por seguridad
 
-        if obstaculo is not None:
-            # Hay algo en el camino, entonces ataca eso en vez de moverse
-            obstaculo.recibir_daño(unidad.daño)
-        elif tablero.celda_valida(fila_destino, columna_destino):
-            # No hay nada en el camino, entonces avanza de verdad
-            tablero.quitar(fila_actual, columna_actual)
-            tablero.colocar(fila_destino, columna_destino, unidad)
-            ficha["fila"] = fila_destino
-            ficha["columna"] = columna_destino
-        # si la celda destino se sale del tablero, simplemente no se mueve
+            siguiente_paso = encontrar_siguiente_paso(
+                tablero, fila_actual, columna_actual, fila_base, columna_base
+            )
+
+            if siguiente_paso is None:
+                break  # ya llegó a la base, o no hay camino disponible
+
+            fila_destino, columna_destino = siguiente_paso
+            obstaculo = hay_obstaculo(tablero, fila_destino, columna_destino)
+
+            if obstaculo is not None:
+                obstaculo.recibir_daño(unidad.daño)
+                if obstaculo.esta_destruida():
+                    tablero.quitar(fila_destino, columna_destino)
+                break  # atacó este turno, no sigue avanzando aunque tenga más velocidad
+            else:
+                tablero.quitar(fila_actual, columna_actual)
+                tablero.colocar(fila_destino, columna_destino, unidad)
+                fila_actual, columna_actual = fila_destino, columna_destino
+
+        ficha["fila"] = fila_actual
+        ficha["columna"] = columna_actual
 
 #estas son para revisar si alguien ganó la ronda
 def gano_atacante(base):
@@ -213,12 +287,12 @@ def dinero_atacante_por_base(base, vida_base_antes):
 # en orden: primero disparan las torres, luego se mueven las unidades,
 # luego activan su habilidad si les toca, y al final se reparte el
 # dinero y se revisa si alguien ganó la ronda.
-def ejecutar_turno(tablero, base, torres_en_juego, unidades_en_juego, dinero_atacante_actual):
+def ejecutar_turno(tablero, base, torres_en_juego, unidades_en_juego, dinero_atacante_actual, fila_base, columna_base):
     vida_base_antes = base.vida_actual
     vidas_torres_antes = {id(ft["torre"]): ft["torre"].vida_actual for ft in torres_en_juego}
 
     disparar_torres(torres_en_juego, unidades_en_juego)
-    mover_unidades(tablero, unidades_en_juego)
+    mover_unidades(tablero, unidades_en_juego, fila_base, columna_base)
     mensajes_habilidades = activar_habilidades_unidades(unidades_en_juego)
 
     dinero_ganado_defensor = dinero_defensor_por_muertes(unidades_en_juego)
