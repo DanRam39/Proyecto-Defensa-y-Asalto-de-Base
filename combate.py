@@ -54,3 +54,25 @@ def mover_unidades(tablero, unidades_en_juego):
             ficha["columna"] = columna_destino
         # si la celda destino se sale del tablero, simplemente no se mueve
 
+#estas son para revisar si alguien ganó la ronda
+def gano_atacante(base):
+    return base.esta_destruida() #returna true si la base si fue destruida
+
+
+def gano_defensor(base, dinero_atacante, unidades_en_juego):
+    if base.esta_destruida():
+        return False #si la base está destruida el defensor no puede ser el ganador
+
+    unidades_vivas = [f for f in unidades_en_juego if f["unidad"].viva] #filtra la lista para ver las unidades q siguen vivas
+    sin_unidades = len(unidades_vivas) == 0 #cuando el atacante ya no tiene nada en el mapa
+    sin_dinero = dinero_atacante <= 0 #cuando ya no tiene plata para generar más unidades
+
+    return sin_unidades and sin_dinero #el defensor gana si ambas se cumplen simultaneamente
+
+#en esta se unen las funciones anteriores para no llamarlas por separado
+def verificar_victoria_ronda(base, dinero_atacante, unidades_en_juego):
+    if gano_atacante(base):
+        return "atacante"
+    if gano_defensor(base, dinero_atacante, unidades_en_juego):
+        return "defensor"
+    return None
