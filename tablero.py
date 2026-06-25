@@ -38,7 +38,7 @@ class Tablero:
 
 class TableroVisual:
     # Esta clase se encarga SOLO de dibujar el Tablero en pantalla.
-    # Recibe un Tablero (la lógica) y un Canvas donde dibujar.
+    # Recibe un Tablero y un Canvas donde dibujar.
     def __init__(self, canvas, tablero, tema_nombre):
         self.canvas = canvas
         self.tablero = tablero
