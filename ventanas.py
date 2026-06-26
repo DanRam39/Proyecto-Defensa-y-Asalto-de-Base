@@ -19,7 +19,7 @@ class VentanaJuego:
         self.ventana.configure(bg="#1a1a2e")
 
         self.contenedor = tk.Frame(self.ventana, bg="#1a1a2e")
-        self.contenedor.pack(fill="both", expand=True)
+        self.contenedor.pack(fill="both", expand=True) 
 
         # Estado de sesión
         self.nombre_j1 = None
@@ -253,6 +253,10 @@ class VentanaJuego:
         self.numero_ronda = 0
         self.dinero_defensor_ronda = 150
         self.dinero_atacante_ronda = 150
+    # Inicializar tablero UNA sola vez aquí
+        self.tablero = Tablero()
+        self.torres_en_juego = []
+        self.unidades_en_juego = []
         self.iniciar_ronda()
 
     # ───────────────────────────────────────────────────────
@@ -261,9 +265,21 @@ class VentanaJuego:
 
     def iniciar_ronda(self):
         self.numero_ronda += 1
-        self.tablero = Tablero()
-        self.torres_en_juego = []
-        self.unidades_en_juego = []
+    # Limpiar unidades muertas de la ronda anterior
+        self.unidades_en_juego = [f for f in self.unidades_en_juego if f["unidad"].viva]
+    # Limpiar torres destruidas de la ronda anterior
+        self.torres_en_juego = [ft for ft in self.torres_en_juego if not ft["torre"].esta_destruida()]
+    # Quitar del tablero las unidades y torres destruidas que quedaron
+        for fila in range(FILAS):
+            for col in range(COLUMNAS):
+                obj = self.tablero.obtener(fila, col)
+                if obj is not None:
+                    # Si es unidad muerta, quitarla
+                    from atacantes import Unidad
+                    if isinstance(obj, Unidad) and not obj.viva:
+                        self.tablero.quitar(fila, col)
+
+    # Nueva base cada ronda, colocada en su posición fija
         self.base_actual = Base(200)
         self.fila_base, self.columna_base = self.tablero.colocar_base(self.base_actual)
         self._mostrar_transicion(
