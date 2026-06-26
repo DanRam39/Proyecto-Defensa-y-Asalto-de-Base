@@ -27,6 +27,25 @@ def hay_obstaculo(tablero, fila, columna):
         return objeto
     return None
 
+def obstaculo_mas_cercano(tablero, fila, columna):
+    # Revisa las 4 celdas vecinas y devuelve la que tenga un obstáculo
+    # destructible (muro o torre), junto con su posición. Si ninguna
+    # vecina tiene nada que atacar, devuelve None.
+    movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    for delta_fila, delta_columna in movimientos:
+        fila_vecina = fila + delta_fila
+        columna_vecina = columna + delta_columna
+
+        if not tablero.celda_valida(fila_vecina, columna_vecina):
+            continue
+
+        obstaculo = hay_obstaculo(tablero, fila_vecina, columna_vecina)
+        if obstaculo is not None:
+            return fila_vecina, columna_vecina, obstaculo
+
+    return None
+
 from collections import deque
 
 def encontrar_siguiente_paso(tablero, fila_inicio, columna_inicio, fila_base, columna_base):
@@ -85,7 +104,6 @@ def encontrar_siguiente_paso(tablero, fila_inicio, columna_inicio, fila_base, co
 
     return paso_actual
 
-# Esta es la principal: mueve a todas las unidades un turno, 
 def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
     for ficha in unidades_en_juego:
         unidad = ficha["unidad"]
@@ -100,18 +118,25 @@ def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
         fila_actual = ficha["fila"]
         columna_actual = ficha["columna"]
 
-        # Repetimos el movimiento tantas veces como velocidad tenga la unidad
-        # (una Unidad Rápida con velocidad 2 se mueve 2 celdas en un turno)
         for _ in range(unidad.velocidad):
             if not unidad.viva:
-                break  # pudo haber muerto a mitad de su propio movimiento, poco probable pero por seguridad
+                break
 
             siguiente_paso = encontrar_siguiente_paso(
                 tablero, fila_actual, columna_actual, fila_base, columna_base
             )
 
             if siguiente_paso is None:
-                break  # ya llegó a la base, o no hay camino disponible
+                # No hay ningún camino libre hacia la base. Puede ser porque
+                # ya llegó, o porque está completamente bloqueada por obstáculos.
+                # En ese caso, ataca al obstáculo más cercano para abrirse paso.
+                obstaculo_cercano = obstaculo_mas_cercano(tablero, fila_actual, columna_actual)
+                if obstaculo_cercano is not None:
+                    fila_obs, columna_obs, objeto_obs = obstaculo_cercano
+                    objeto_obs.recibir_daño(unidad.daño)
+                    if objeto_obs.esta_destruida():
+                        tablero.quitar(fila_obs, columna_obs)
+                break  # ya sea que atacó o ya llegó a la base, termina su turno aquí
 
             fila_destino, columna_destino = siguiente_paso
             obstaculo = hay_obstaculo(tablero, fila_destino, columna_destino)
@@ -120,7 +145,7 @@ def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
                 obstaculo.recibir_daño(unidad.daño)
                 if obstaculo.esta_destruida():
                     tablero.quitar(fila_destino, columna_destino)
-                break  # atacó este turno, no sigue avanzando aunque tenga más velocidad
+                break
             else:
                 tablero.quitar(fila_actual, columna_actual)
                 tablero.colocar(fila_destino, columna_destino, unidad)

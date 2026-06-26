@@ -1,32 +1,38 @@
-#Acá se muestra el top 5 de jugadores según victorias ya sea como defensor y atacante.
 import json
 import os
 
 ARCHIVO_USUARIOS = "usuarios.json"
 
-# Carga los usuarios desde el archivo JSON
 def cargar_usuarios():
-    if not os.path.exists(ARCHIVO_USUARIOS): #si el archivo no existe devuelve lista vacía 
+    if not os.path.exists(ARCHIVO_USUARIOS):
         return {}
-    with open(ARCHIVO_USUARIOS, "r") as f: # cuando se abre el archivo saca los datos de los jugadores y los deja listos para utilizarlos.
+    with open(ARCHIVO_USUARIOS, "r") as f:
         return json.load(f)
 
-#busca los usuarios 
+def guardar_usuarios(usuarios):
+    with open(ARCHIVO_USUARIOS, "w") as f:
+        json.dump(usuarios, f, indent=4)
+
+def guardar_puntaje(nombre, puntos):
+    usuarios = cargar_usuarios()
+    if nombre in usuarios:
+        usuarios[nombre]["puntaje"] = usuarios[nombre].get("puntaje", 0) + puntos
+        guardar_usuarios(usuarios)
+
 def top_defensores():
     usuarios = cargar_usuarios()
-    ordenados = sorted( # se acomodan de mayor a menor tomando en cuenta solo la cantidad de victorias 
+    ordenados = sorted(
         usuarios.items(),
-        key=lambda x: x[1]["victorias_defensor"], #busca el dato victorias como defensor
+        key=lambda x: x[1].get("victorias_defensor", 0),
         reverse=True
     )
-    return ordenados#la lista no se corta para que retorne todos los puntajes
+    return ordenados
 
-#aqui se retonan todos los jugadores ordenados por victorias siendo atacantes
 def top_atacantes():
     usuarios = cargar_usuarios()
     ordenados = sorted(
         usuarios.items(),
-        key=lambda x: x[1]["victorias_atacante"], # busca el dato victorias_atacante
+        key=lambda x: x[1].get("victorias_atacante", 0),
         reverse=True
     )
-    return ordenados # la lista no se corta para que retorne todos los puntajes
+    return ordenados

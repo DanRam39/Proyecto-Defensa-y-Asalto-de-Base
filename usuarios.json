@@ -1,0 +1,18 @@
+{
+    "daniel": {
+        "contrasena": "1234",
+        "victorias_defensor": 0,
+        "victorias_atacante": 0
+    },
+    "celeste": {
+        "contrasena": "1234",
+        "victorias_defensor": 0,
+        "victorias_atacante": 0
+    },
+    "antwan": {
+        "contrasena": "1234",
+        "victorias_defensor": 1,
+        "victorias_atacante": 0,
+        "puntaje": 575
+    }
+}
