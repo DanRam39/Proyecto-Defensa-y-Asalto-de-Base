@@ -265,26 +265,33 @@ class VentanaJuego:
 
     def iniciar_ronda(self):
         self.numero_ronda += 1
-    # Limpiar unidades muertas de la ronda anterior
-        self.unidades_en_juego = [f for f in self.unidades_en_juego if f["unidad"].viva]
-    # Limpiar torres destruidas de la ronda anterior
-        self.torres_en_juego = [ft for ft in self.torres_en_juego if not ft["torre"].esta_destruida()]
-    # Quitar del tablero las unidades y torres destruidas que quedaron
+
+        # Quitar del tablero unidades muertas
+        from atacantes import Unidad
         for fila in range(FILAS):
             for col in range(COLUMNAS):
                 obj = self.tablero.obtener(fila, col)
-                if obj is not None:
-                    # Si es unidad muerta, quitarla
-                    from atacantes import Unidad
-                    if isinstance(obj, Unidad) and not obj.viva:
-                        self.tablero.quitar(fila, col)
+                if isinstance(obj, Unidad) and not obj.viva:
+                    self.tablero.quitar(fila, col)
 
-    # Nueva base cada ronda, colocada en su posición fija
+        # Limpiar de las listas las unidades muertas y torres destruidas
+        self.unidades_en_juego = [f for f in self.unidades_en_juego if f["unidad"].viva]
+        self.torres_en_juego = [ft for ft in self.torres_en_juego if not ft["torre"].esta_destruida()]
+
+        # Nueva base cada ronda en su posición fija
         self.base_actual = Base(200)
         self.fila_base, self.columna_base = self.tablero.colocar_base(self.base_actual)
+
         self._mostrar_transicion(
             self.nombre_defensor, "Defensor 🛡",
             self.mostrar_construccion)
+
+        # Nueva base cada ronda, colocada en su posición fija
+        self.base_actual = Base(200)
+        self.fila_base, self.columna_base = self.tablero.colocar_base(self.base_actual)
+        self._mostrar_transicion(
+                self.nombre_defensor, "Defensor 🛡",
+                self.mostrar_construccion)
 
     def _mostrar_transicion(self, jugador, rol, callback):
         self.limpiar()
@@ -307,7 +314,6 @@ class VentanaJuego:
         self.contenedor.configure(bg="#1a1a2e")
         self.opcion_seleccionada = None
 
-        # Encabezado
         top = tk.Frame(self.contenedor, bg="#1a1a2e")
         top.pack(fill="x", padx=10, pady=6)
         tk.Label(top,
@@ -318,7 +324,6 @@ class VentanaJuego:
                  font=("Arial", 13, "bold"), bg="#1a1a2e", fg="#f4d03f")
         self.lbl_dinero_def.pack(side="right")
 
-        # Botones de compra
         shop = tk.Frame(self.contenedor, bg="#16213e")
         shop.pack(fill="x", padx=10, pady=2)
         self.lbl_sel_def = tk.Label(shop, text="Selecciona qué colocar:",
@@ -335,17 +340,15 @@ class VentanaJuego:
                       relief="flat", cursor="hand2", padx=6, pady=4
                       ).pack(side="left", padx=3, pady=6)
 
-        # Canvas
         self.canvas = tk.Canvas(self.contenedor,
                                 width=COLUMNAS * TAMANO_CELDA,
                                 height=FILAS * TAMANO_CELDA,
                                 bg="#1a1a2e", highlightthickness=0)
         self.canvas.pack(pady=4)
         self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
-        self.visual.actualizar_celda(self.fila_base, self.columna_base)
+        self.visual.refrescar_todo()  # ← muestra torres y muros de rondas anteriores
         self.canvas.bind("<Button-1>", self._click_construccion)
 
-        # Info
         info = tk.Frame(self.contenedor, bg="#16213e")
         info.pack()
         for txt in ["Torre Básica: Vida 100 · Daño 15 · Alcance 3",
@@ -439,13 +442,13 @@ class VentanaJuego:
                                 bg="#1a1a2e", highlightthickness=0)
         self.canvas.pack(pady=4)
         self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
-        self.visual.refrescar_todo()
+        self.visual.refrescar_todo()  # ← muestra todo lo que ya hay, incluyendo unidades anteriores
         self.canvas.bind("<Button-1>", self._click_ataque)
 
         info = tk.Frame(self.contenedor, bg="#16213e")
         info.pack()
-        for txt in ["Soldado: Vida 80 · Daño 15 · Vel 1 · Coloca en las 3 columnas de la derecha",
-                    "Tanque: Vida 250 · Daño 30 · Vel 1  |  Unidad Rápida: Vida 60 · Daño 10 · Vel 2"]:
+        for txt in ["Soldado: Vida 80 · Daño 15 · Vel 1  |  Tanque: Vida 250 · Daño 30 · Vel 1",
+                    "Unidad Rápida: Vida 60 · Daño 10 · Vel 2  |  Coloca en las 3 columnas de la derecha"]:
             tk.Label(info, text=txt, font=("Arial", 8),
                      bg="#16213e", fg="#a8dadc").pack(anchor="w", padx=8)
 
