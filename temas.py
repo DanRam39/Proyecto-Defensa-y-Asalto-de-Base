@@ -35,4 +35,4 @@ def listar_temas():
 
 # Valida que el atacante y defensor no elijan lo mismo 
 def validar_facciones(faccion_defensor, faccion_atacante):
-    return faccion_defensor != faccion_atacante #verificación 
+    return faccion_defensor != faccion_atacante #verificació
