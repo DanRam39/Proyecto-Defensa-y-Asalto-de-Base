@@ -9,10 +9,11 @@ class Unidad:
         self.vida_actual = vida
         self.daño = daño
         self.velocidad = velocidad
-        self.turno_habilidad = 3  # la habilidad se activa cada 3 turnos
+        self.turno_habilidad = 3
         self.turnos_jugados = 0
         self.viva = True
-        self.velocidad_congelada = False #es true cuando una torre mágica la congela, combate.py la revisq
+        self.velocidad_congelada = False
+        self.cobrada = False  # ← nueva: evita cobrar la misma muerte dos veces
 
 #tiene la función de restar vida y si llega a 0 se muere 
     def recibir_daño(self, cantidad):

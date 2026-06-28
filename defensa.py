@@ -2,9 +2,14 @@
 # la Base central que se debe proteger, y las Torres que la defienden.
 
 class Base:
-    def __init__(self, vida_maxima):
+    # La base ahora también puede atacar: es la última línea de defensa.
+    # daño y alcance tienen valores por defecto para no romper el código
+    # existente que crea Base(200) sin pasar esos parámetros.
+    def __init__(self, vida_maxima, daño=20, alcance=2):
         self.vida_maxima = vida_maxima  # vida con la que arranca, sirve de referencia (ej. para barra de vida)
         self.vida_actual = vida_maxima  # vida que va bajando conforme recibe ataques
+        self.daño = daño        # daño que hace la base al disparar
+        self.alcance = alcance  # qué tan lejos puede atacar dentro del mapa
 
     def recibir_daño(self, cantidad):
         # Se llama cuando una unidad atacante le hace daño a la base

@@ -1,14 +1,15 @@
 {
     "daniel": {
         "contrasena": "1234",
-        "victorias_defensor": 1,
+        "victorias_defensor": 4,
         "victorias_atacante": 0,
-        "puntaje": 575
+        "puntaje": 6965
     },
     "celeste": {
         "contrasena": "1234",
         "victorias_defensor": 0,
-        "victorias_atacante": 0
+        "victorias_atacante": 1,
+        "puntaje": 2100
     },
     "antwan": {
         "contrasena": "1234",

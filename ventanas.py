@@ -3,7 +3,7 @@ from tkinter import messagebox
 
 from tablero import Tablero, TableroVisual, FILAS, COLUMNAS, TAMANO_CELDA
 from defensa import Base, Torre
-from combate import (Muro, disparar_torres, mover_unidades,
+from combate import (Muro, disparar_torres, disparar_base, mover_unidades,
                      activar_habilidades_unidades, dinero_defensor_por_muertes,
                      dinero_atacante_por_torres, dinero_atacante_por_base)
 from atacantes import Soldado, Tanque, Rapida
@@ -41,6 +41,7 @@ class VentanaJuego:
         self.tablero = None
         self.base_actual = None
         self.torres_en_juego = []
+        self.muros_en_juego = []
         self.unidades_en_juego = []
         self.fila_base = 5
         self.columna_base = 0
@@ -256,6 +257,7 @@ class VentanaJuego:
     # Inicializar tablero UNA sola vez aquí
         self.tablero = Tablero()
         self.torres_en_juego = []
+        self.muros_en_juego = []
         self.unidades_en_juego = []
         self.iniciar_ronda()
 
@@ -266,19 +268,62 @@ class VentanaJuego:
     def iniciar_ronda(self):
         self.numero_ronda += 1
 
-        # Quitar del tablero unidades muertas
-        from atacantes import Unidad
-        for fila in range(FILAS):
-            for col in range(COLUMNAS):
-                obj = self.tablero.obtener(fila, col)
-                if isinstance(obj, Unidad) and not obj.viva:
-                    self.tablero.quitar(fila, col)
+        # Todas las torres reaparecen con vida completa en su posición
+        # original al iniciar la ronda, incluso las que fueron destruidas
+        # en la ronda anterior. Antes se eliminaban para siempre; ahora
+        # se reconstruyen en el mismo lugar.
+        torres_reconstruidas = []
+        for ft in self.torres_en_juego:
+            torre = ft["torre"]
+            self.tablero.quitar(ft["fila"], ft["columna"])
+            torre.vida_actual = torre.vida_maxima
+            torre.turnos_restantes = torre.turnos_habilidad
+            colocada = self.tablero.colocar(ft["fila"], ft["columna"], torre)
+            if colocada:
+                torres_reconstruidas.append(ft)
+            # Si por alguna razón la celda ya no está libre (no debería
+            # pasar, pero por seguridad), la torre se descarta en vez de
+            # quedar fantasma sin estar en el tablero.
+        self.torres_en_juego = torres_reconstruidas
 
-        # Limpiar de las listas las unidades muertas y torres destruidas
-        self.unidades_en_juego = [f for f in self.unidades_en_juego if f["unidad"].viva]
-        self.torres_en_juego = [ft for ft in self.torres_en_juego if not ft["torre"].esta_destruida()]
+        # Los muros reaparecen igual que las torres. Antes no tenían
+        # ninguna lista propia (se colocaban en el tablero y se
+        # olvidaban), así que cuando se destruían en combate se perdían
+        # para siempre y nunca volvían a aparecer en rondas siguientes.
+        muros_reconstruidos = []
+        for fm in self.muros_en_juego:
+            muro = fm["muro"]
+            self.tablero.quitar(fm["fila"], fm["columna"])
+            muro.vida_actual = muro.vida_maxima
+            colocado = self.tablero.colocar(fm["fila"], fm["columna"], muro)
+            if colocado:
+                muros_reconstruidos.append(fm)
+        self.muros_en_juego = muros_reconstruidos
 
-        # Nueva base cada ronda en su posición fija
+        # Todas las unidades vuelven a origen con vida completa
+        for ficha in self.unidades_en_juego:
+            unidad = ficha["unidad"]
+            self.tablero.quitar(ficha["fila"], ficha["columna"])
+            unidad.vida_actual    = unidad.vida_maxima
+            unidad.viva           = True
+            unidad.velocidad_congelada = False
+            unidad.cobrada        = False
+            unidad.turnos_jugados = 0
+            ficha["fila"]    = ficha["fila_origen"]
+            ficha["columna"] = ficha["columna_origen"]
+            self.tablero.colocar(ficha["fila_origen"], ficha["columna_origen"], unidad)
+
+        # Nueva base: hay que quitar la base vieja del tablero ANTES de
+        # colocar la nueva. Sin esto, Tablero.colocar() fallaba en
+        # silencio porque la celda ya estaba ocupada por la base de la
+        # ronda anterior: self.base_actual pasaba a apuntar a un objeto
+        # nuevo con vida completa, pero el objeto que de verdad recibía
+        # los ataques en el tablero seguía siendo el viejo, con la vida
+        # (a veces muy baja) que le había quedado del combate anterior.
+        # Por eso a veces parecía que la base "no recibía daño": el daño
+        # sí se aplicaba, pero a un objeto que el marcador ya no miraba.
+        if self.base_actual is not None:
+            self.tablero.quitar(self.fila_base, self.columna_base)
         self.base_actual = Base(200)
         self.fila_base, self.columna_base = self.tablero.colocar_base(self.base_actual)
 
@@ -286,12 +331,7 @@ class VentanaJuego:
             self.nombre_defensor, "Defensor 🛡",
             self.mostrar_construccion)
 
-        # Nueva base cada ronda, colocada en su posición fija
-        self.base_actual = Base(200)
-        self.fila_base, self.columna_base = self.tablero.colocar_base(self.base_actual)
-        self._mostrar_transicion(
-                self.nombre_defensor, "Defensor 🛡",
-                self.mostrar_construccion)
+
 
     def _mostrar_transicion(self, jugador, rol, callback):
         self.limpiar()
@@ -381,7 +421,10 @@ class VentanaJuego:
         obj = self._crear_objeto(self.opcion_seleccionada)
         self.tablero.colocar(fila, col, obj)
         self.visual.actualizar_celda(fila, col)
-        if self.opcion_seleccionada != "muro":
+        if self.opcion_seleccionada == "muro":
+            self.muros_en_juego.append(
+                {"fila": fila, "columna": col, "muro": obj})
+        else:
             self.torres_en_juego.append(
                 {"fila": fila, "columna": col, "torre": obj})
         self.dinero_defensor_ronda -= costo
@@ -465,7 +508,7 @@ class VentanaJuego:
         col  = evento.x // TAMANO_CELDA
         fila = evento.y // TAMANO_CELDA
         if col < COLUMNAS - 3:
-            return  # solo las 3 columnas del lado derecho
+            return
         costos = {"soldado": 50, "tanque": 120, "rapida": 70}
         costo = costos[self.opcion_seleccionada]
         if self.dinero_atacante_ronda < costo:
@@ -475,8 +518,13 @@ class VentanaJuego:
         unidad = self._crear_unidad(self.opcion_seleccionada)
         self.tablero.colocar(fila, col, unidad)
         self.visual.actualizar_celda(fila, col)
-        self.unidades_en_juego.append(
-            {"fila": fila, "columna": col, "unidad": unidad})
+        self.unidades_en_juego.append({
+            "fila": fila,
+            "columna": col,
+            "fila_origen": fila,      # ← posición original guardada
+            "columna_origen": col,    # ← posición original guardada
+            "unidad": unidad
+        })
         self.dinero_atacante_ronda -= costo
         self.lbl_dinero_atk.config(text=f"💰 {self.dinero_atacante_ronda}")
 
@@ -526,6 +574,7 @@ class VentanaJuego:
         self._pts_def_ronda = 0
         self._pts_atk_ronda = 0
         self._combate_terminado = False
+        self._turnos_combate = 0  # salvaguarda: tope de turnos para evitar combates eternos
 
         self._tick_id = self.ventana.after(700, self._tick)
 
@@ -539,31 +588,28 @@ class VentanaJuego:
         if self._combate_terminado:
             return
 
-        vida_base_antes    = self.base_actual.vida_actual
-        vidas_torres_antes = {id(ft["torre"]): ft["torre"].vida_actual
-                              for ft in self.torres_en_juego}
-
-        # Motor de combate
-        disparar_torres(self.torres_en_juego, self.unidades_en_juego)
-        mover_unidades(self.tablero, self.unidades_en_juego,
-                       self.fila_base, self.columna_base)
+        gan_def = disparar_torres(self.tablero, self.torres_en_juego, self.unidades_en_juego)
+        gan_def += disparar_base(self.tablero, self.base_actual, self.fila_base,
+                                  self.columna_base, self.unidades_en_juego)
+        gan_atk = mover_unidades(self.tablero, self.unidades_en_juego,
+                                  self.fila_base, self.columna_base)
         msgs = activar_habilidades_unidades(self.unidades_en_juego)
 
-        # Limpiar torres destruidas
-        self.torres_en_juego = [ft for ft in self.torres_en_juego
-                                 if not ft["torre"].esta_destruida()]
+        # Las torres destruidas se quedan en la lista (con vida_actual<=0):
+        # disparar_torres ya las salta al disparar porque revisa
+        # esta_destruida() antes de cada una. Se mantienen en la lista
+        # a propósito para que iniciar_ronda() las pueda reconstruir con
+        # vida completa al empezar la próxima ronda; si se filtraban y
+        # eliminaban aquí, ya no había nada que reconstruir después.
 
-        # Dinero de este tick
-        gan_def = dinero_defensor_por_muertes(self.unidades_en_juego)
-        gan_atk = dinero_atacante_por_torres(self.torres_en_juego, vidas_torres_antes)
-        gan_atk += dinero_atacante_por_base(self.base_actual, vida_base_antes)
+        gan_def += dinero_defensor_por_muertes(self.unidades_en_juego)
+        # El dinero del atacante por golpear base ya viene dentro de mover_unidades
 
-        self._pts_def_ronda          += gan_def
-        self._pts_atk_ronda          += gan_atk
-        self.dinero_defensor_ronda   += gan_def
-        self.dinero_atacante_ronda   += gan_atk
+        self._pts_def_ronda        += gan_def
+        self._pts_atk_ronda        += gan_atk
+        self.dinero_defensor_ronda += gan_def
+        self.dinero_atacante_ronda += gan_atk
 
-        # Actualizar UI
         self.visual.refrescar_todo()
         self.lbl_vida_base.config(
             text=f"🏰 Base: {self.base_actual.vida_actual}/{self.base_actual.vida_maxima}")
@@ -575,13 +621,21 @@ class VentanaJuego:
         if gan_atk > 0:
             self._log(f"  Atacante +{gan_atk} 💰\n")
 
-        # Verificar fin de ronda
+        self._turnos_combate += 1
+
         unidades_vivas = [f for f in self.unidades_en_juego if f["unidad"].viva]
         ganador = None
         if self.base_actual.esta_destruida():
             ganador = "atacante"
         elif len(unidades_vivas) == 0:
             ganador = "defensor"
+        elif self._turnos_combate >= 200:
+            # Salvaguarda: si el combate se extiende demasiado sin que
+            # nadie gane (por ejemplo, unidades atascadas que ya no
+            # pueden avanzar ni atacar), la ronda se cierra a favor del
+            # defensor, ya que el atacante no logró destruir la base.
+            ganador = "defensor"
+            self._log("\n⏱  Tiempo límite de la ronda alcanzado.\n")
 
         if ganador:
             self._combate_terminado = True
@@ -589,7 +643,6 @@ class VentanaJuego:
             self.ventana.after(1200, lambda: self._fin_ronda(ganador))
         else:
             self._tick_id = self.ventana.after(700, self._tick)
-
     # ───────────────────────────────────────────────────────
     #  FIN DE RONDA / PARTIDA
     # ───────────────────────────────────────────────────────
@@ -602,6 +655,42 @@ class VentanaJuego:
             self.victorias_atacante += 1
             self.puntos_atacante    += self._pts_atk_ronda
 
+        self._mostrar_resultado_ronda(ganador_ronda)
+
+    def _mostrar_resultado_ronda(self, ganador_ronda):
+        # Pantalla dedicada para que se pueda leer con calma quién ganó
+        # la ronda. Antes esto solo se veía un instante en el log de
+        # combate (que se borra al pasar de pantalla) y era imposible
+        # de leer a tiempo.
+        self.limpiar()
+        self.contenedor.configure(bg="#1a1a2e")
+
+        if ganador_ronda == "defensor":
+            nombre_ganador = self.nombre_defensor
+            color = "#a8dadc"
+            icono = "🛡"
+        else:
+            nombre_ganador = self.nombre_atacante
+            color = "#e94560"
+            icono = "⚔"
+
+        self._titulo(self.contenedor, f"Resultado de la Ronda {self.numero_ronda}", size=20)
+        tk.Label(self.contenedor,
+                 text=f"{icono}  ¡{nombre_ganador} gana la ronda!  {icono}",
+                 font=("Georgia", 18, "bold"),
+                 bg="#1a1a2e", fg=color).pack(pady=16)
+
+        card = self._card()
+        tk.Label(card,
+                 text=(f"Marcador de la partida\n\n"
+                       f"🛡 {self.nombre_defensor} (defensor): {self.victorias_defensor} rondas\n"
+                       f"⚔ {self.nombre_atacante} (atacante): {self.victorias_atacante} rondas"),
+                 font=("Arial", 12), bg=card.cget("bg"), fg="white",
+                 justify="center").pack(pady=10)
+
+        self._boton(self.contenedor, "Continuar ▶", self._continuar_tras_resultado, width=24)
+
+    def _continuar_tras_resultado(self):
         if self.victorias_defensor >= 3 or self.victorias_atacante >= 3:
             self._fin_partida()
         else:

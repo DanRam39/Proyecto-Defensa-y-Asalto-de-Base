@@ -14,9 +14,16 @@ def guardar_usuarios(usuarios):
         json.dump(usuarios, f, indent=4)
 
 def guardar_puntaje(nombre, puntos):
+    # El ranking debe mostrar la mejor puntuación de una partida ganada,
+    # no la suma de todas las partidas jugadas. Antes esto sumaba
+    # "puntos" al valor guardado cada vez, así que alguien que ganara
+    # muchas partidas chicas terminaba más arriba en el ranking que
+    # alguien que ganó pocas partidas pero mucho mejores. Ahora se
+    # guarda solo si "puntos" es mayor al récord que ya tenía.
     usuarios = cargar_usuarios()
     if nombre in usuarios:
-        usuarios[nombre]["puntaje"] = usuarios[nombre].get("puntaje", 0) + puntos
+        mejor_puntaje_anterior = usuarios[nombre].get("puntaje", 0)
+        usuarios[nombre]["puntaje"] = max(mejor_puntaje_anterior, puntos)
         guardar_usuarios(usuarios)
 
 def top_defensores():

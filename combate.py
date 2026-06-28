@@ -48,49 +48,41 @@ def obstaculo_mas_cercano(tablero, fila, columna):
 
 from collections import deque
 
-def encontrar_siguiente_paso(tablero, fila_inicio, columna_inicio, fila_base, columna_base):
-    # Primero revisa si hay una torre o muro adyacente para atacar directamente
-    # Las unidades prefieren atacar obstáculos cercanos antes de moverse
+def encontrar_siguiente_paso_a_estructura(tablero, fila_inicio, columna_inicio):
+    """BFS hacia la Torre o Muro más cercana.
+    Retorna None si ya está adyacente (debe atacar) o si no hay estructuras."""
     movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    # Si ya está adyacente a Torre/Muro, atacar en vez de moverse
     for df, dc in movimientos:
         fv, cv = fila_inicio + df, columna_inicio + dc
-        if not tablero.celda_valida(fv, cv):
-            continue
-        obj = tablero.obtener(fv, cv)
-        if isinstance(obj, (Torre, Muro)):
-            return None  # hay torre/muro adyacente, que ataque en vez de moverse
+        if tablero.celda_valida(fv, cv) and isinstance(tablero.obtener(fv, cv), (Torre, Muro)):
+            return None
 
-    # Si no hay torres/muros adyacentes, BFS hacia la base
     inicio = (fila_inicio, columna_inicio)
-    destino = (fila_base, columna_base)
-
-    if inicio == destino:
-        return None
-
     cola = deque([inicio])
     visitadas = {inicio: None}
+    destino = None  # celda desde la que se puede atacar una Torre/Muro
 
-    encontrado = False
     while cola:
         actual = cola.popleft()
-        if actual == destino:
-            encontrado = True
-            break
         fa, ca = actual
         for df, dc in movimientos:
             vecina = (fa + df, ca + dc)
             fv, cv = vecina
-            if vecina in visitadas:
-                continue
-            if not tablero.celda_valida(fv, cv):
+            if vecina in visitadas or not tablero.celda_valida(fv, cv):
                 continue
             obj = tablero.obtener(fv, cv)
-            if obj is not None and vecina != destino:
-                continue
-            visitadas[vecina] = actual
-            cola.append(vecina)
+            if isinstance(obj, (Torre, Muro)):
+                destino = actual  # 'actual' es adyacente a esta estructura
+                break
+            if obj is None:
+                visitadas[vecina] = actual
+                cola.append(vecina)
+        if destino is not None:
+            break
 
-    if not encontrado:
+    if destino is None or destino == inicio:
         return None
 
     paso_actual = destino
@@ -98,13 +90,95 @@ def encontrar_siguiente_paso(tablero, fila_inicio, columna_inicio, fila_base, co
         paso_actual = visitadas[paso_actual]
     return paso_actual
 
+
+def encontrar_siguiente_paso_a_base(tablero, fila_inicio, columna_inicio, fila_base, columna_base):
+    """BFS hacia la Base. Solo se llama cuando no quedan Torres ni Muros.
+    Retorna None si ya está adyacente (debe atacar) o si no hay camino."""
+    movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    # Si ya está adyacente a la Base, atacar en vez de moverse
+    for df, dc in movimientos:
+        fv, cv = fila_inicio + df, columna_inicio + dc
+        if tablero.celda_valida(fv, cv) and isinstance(tablero.obtener(fv, cv), Base):
+            return None
+
+    inicio = (fila_inicio, columna_inicio)
+    cola = deque([inicio])
+    visitadas = {inicio: None}
+    destino = None  # celda adyacente a la Base
+
+    while cola:
+        actual = cola.popleft()
+        fa, ca = actual
+        for df, dc in movimientos:
+            vecina = (fa + df, ca + dc)
+            fv, cv = vecina
+            if vecina in visitadas or not tablero.celda_valida(fv, cv):
+                continue
+            obj = tablero.obtener(fv, cv)
+            if isinstance(obj, Base):
+                destino = actual  # 'actual' es adyacente a la Base
+                break
+            if obj is None:
+                visitadas[vecina] = actual
+                cola.append(vecina)
+        if destino is not None:
+            break
+
+    if destino is None or destino == inicio:
+        return None
+
+    paso_actual = destino
+    while visitadas[paso_actual] != inicio:
+        paso_actual = visitadas[paso_actual]
+    return paso_actual
+
+# Cuando el camino que sugiere el BFS ya está ocupado por otra unidad
+# propia (puede pasar cuando varias unidades convergen al mismo punto
+# en el mismo turno), esta función busca cualquier celda vecina libre
+# que sí acerque a la unidad a su destino. Sin esto, varias unidades
+# pueden bloquearse entre sí para siempre: cada una quiere ir a la
+# celda que ocupa la otra, ninguna se mueve nunca, y la ronda nunca
+# termina aunque ya no quede nada más que hacer.
+def movimiento_alternativo(tablero, fila_actual, columna_actual, fila_objetivo, columna_objetivo):
+    movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    distancia_actual = abs(fila_actual - fila_objetivo) + abs(columna_actual - columna_objetivo)
+ 
+    mejor_opcion = None
+    mejor_distancia = distancia_actual
+    cualquier_libre = None  # último recurso: cualquier celda libre, aunque no acerque
+ 
+    for df, dc in movimientos:
+        fv, cv = fila_actual + df, columna_actual + dc
+        if not tablero.celda_valida(fv, cv):
+            continue
+        if tablero.obtener(fv, cv) is not None:
+            continue  # celda ocupada, no sirve
+        if cualquier_libre is None:
+            cualquier_libre = (fv, cv)
+        distancia = abs(fv - fila_objetivo) + abs(cv - columna_objetivo)
+        if distancia < mejor_distancia:
+            mejor_distancia = distancia
+            mejor_opcion = (fv, cv)
+ 
+    if mejor_opcion is not None:
+        return mejor_opcion
+    # Cuando todo el frente está bloqueado por unidades propias, no hay
+    # ninguna celda libre que acerque directamente. En vez de quedarse
+    # inmóvil para siempre (lo que trababa la ronda), se acepta un paso
+    # lateral o hacia atrás: eso libera espacio y, turno a turno, permite
+    # que el grupo se reorganice y termine llegando a la base.
+    return cualquier_libre
+ 
+ 
 def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
+    dinero_ganado_atacante = 0
+    movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
     for ficha in unidades_en_juego:
         unidad = ficha["unidad"]
-
         if not unidad.viva:
             continue
-
         if unidad.velocidad_congelada:
             unidad.descongelar()
             continue
@@ -116,9 +190,9 @@ def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
             if not unidad.viva:
                 break
 
-            # Primero revisa si hay torre o muro adyacente para atacar
             ataco = False
-            movimientos = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+            # PASO 1: Atacar Torre o Muro adyacente (prioridad máxima)
             for df, dc in movimientos:
                 fv, cv = fila_actual + df, columna_actual + dc
                 if not tablero.celda_valida(fv, cv):
@@ -126,36 +200,96 @@ def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
                 obj = tablero.obtener(fv, cv)
                 if isinstance(obj, (Torre, Muro)):
                     obj.recibir_daño(unidad.daño)
+                    dinero_ganado_atacante += 10       # +10 por golpear
                     if obj.esta_destruida():
+                        dinero_ganado_atacante += obj.costo  # +costo al destruir
                         tablero.quitar(fv, cv)
                     ataco = True
-                    break  # ataca solo uno por paso
+                    break
 
             if ataco:
-                break  # si atacó, no se mueve este paso
+                break  # atacó, termina su turno
 
-            # Si no atacó, intenta moverse con BFS
-            siguiente_paso = encontrar_siguiente_paso(
+            # PASO 2: Moverse hacia la Torre/Muro más cercana
+            siguiente = encontrar_siguiente_paso_a_estructura(
+                tablero, fila_actual, columna_actual
+            )
+            if siguiente is not None:
+                tablero.quitar(fila_actual, columna_actual)
+                if tablero.colocar(siguiente[0], siguiente[1], unidad):
+                    fila_actual, columna_actual = siguiente
+                    continue  # usar el siguiente paso de velocidad
+                else:
+                    # La celda destino ya fue ocupada por otra unidad en este
+                    # mismo turno. Antes esto dejaba a la unidad "fantasma"
+                    # (borrada del tablero sin volver a colocarse en ningún
+                    # lado). Ahora se intenta un movimiento alternativo para
+                    # no quedar bloqueada para siempre; si no hay ninguno,
+                    # se queda donde estaba y reintenta el próximo tick.
+                    alterno = movimiento_alternativo(
+                        tablero, fila_actual, columna_actual, siguiente[0], siguiente[1]
+                    )
+                    destino = alterno if alterno is not None else (fila_actual, columna_actual)
+                    tablero.colocar(destino[0], destino[1], unidad)
+                    fila_actual, columna_actual = destino
+                    break
+
+            # PASO 3: No hay Torres ni Muros → atacar Base si está adyacente
+            for df, dc in movimientos:
+                fv, cv = fila_actual + df, columna_actual + dc
+                if not tablero.celda_valida(fv, cv):
+                    continue
+                obj = tablero.obtener(fv, cv)
+                if isinstance(obj, Base):
+                    obj.recibir_daño(unidad.daño)
+                    dinero_ganado_atacante += 10       # +10 por golpear la base
+                    ataco = True
+                    break
+
+            if ataco:
+                break  # atacó la base, termina su turno
+
+            # PASO 4: Moverse hacia la Base
+            siguiente = encontrar_siguiente_paso_a_base(
                 tablero, fila_actual, columna_actual, fila_base, columna_base
             )
-
-            if siguiente_paso is None:
-                # Completamente bloqueada o ya en la base
-                obstaculo_cercano = obstaculo_mas_cercano(tablero, fila_actual, columna_actual)
-                if obstaculo_cercano is not None:
-                    fila_obs, columna_obs, objeto_obs = obstaculo_cercano
-                    objeto_obs.recibir_daño(unidad.daño)
-                    if objeto_obs.esta_destruida():
-                        tablero.quitar(fila_obs, columna_obs)
+            if siguiente is None:
+                # Puede ser que ya esté adyacente a la base (no necesita
+                # moverse, ya se atacó en el PASO 3) o que el BFS no haya
+                # encontrado ningún camino libre porque todas las rutas
+                # están ocupadas por otras unidades propias (congestión).
+                # En ese segundo caso, sin esto la unidad se queda parada
+                # para siempre y la ronda nunca termina. Se intenta un
+                # paso lateral simple que la acerque a la base, aunque
+                # no exista todavía un camino completo de punta a punta.
+                alterno = movimiento_alternativo(
+                    tablero, fila_actual, columna_actual, fila_base, columna_base
+                )
+                if alterno is not None:
+                    tablero.quitar(fila_actual, columna_actual)
+                    tablero.colocar(alterno[0], alterno[1], unidad)
+                    fila_actual, columna_actual = alterno
                 break
 
-            fila_destino, columna_destino = siguiente_paso
             tablero.quitar(fila_actual, columna_actual)
-            tablero.colocar(fila_destino, columna_destino, unidad)
-            fila_actual, columna_actual = fila_destino, columna_destino
+            if tablero.colocar(siguiente[0], siguiente[1], unidad):
+                fila_actual, columna_actual = siguiente
+            else:
+                # Misma situación que en el PASO 2: la celda ya la ocupó
+                # otra unidad en este tick. Se intenta un movimiento
+                # alternativo para no quedar bloqueada para siempre.
+                alterno = movimiento_alternativo(
+                    tablero, fila_actual, columna_actual, siguiente[0], siguiente[1]
+                )
+                destino = alterno if alterno is not None else (fila_actual, columna_actual)
+                tablero.colocar(destino[0], destino[1], unidad)
+                fila_actual, columna_actual = destino
+                break
 
         ficha["fila"] = fila_actual
         ficha["columna"] = columna_actual
+
+    return dinero_ganado_atacante
 
 #estas son para revisar si alguien ganó la ronda
 def gano_atacante(base):
@@ -207,11 +341,40 @@ def ficha_mas_cercana(fila_torre, columna_torre, fichas):
     return mas_cercana
 
 
+# La base es la última línea de defensa: ataca igual que una torre,
+# a la unidad enemiga más cercana que tenga dentro de su alcance.
+# Se llama una vez por turno, junto con disparar_torres.
+def disparar_base(tablero, base, fila_base, columna_base, unidades_en_juego):
+    dinero_ganado_defensor = 0
+    if base.esta_destruida():
+        return dinero_ganado_defensor
+
+    en_rango = unidades_en_rango(fila_base, columna_base, base.alcance, unidades_en_juego)
+    if not en_rango:
+        return dinero_ganado_defensor
+
+    objetivo_ficha = ficha_mas_cercana(fila_base, columna_base, en_rango)
+    objetivo = objetivo_ficha["unidad"]
+    vida_antes = objetivo.vida_actual
+
+    objetivo.recibir_daño(base.daño)
+
+    if objetivo.vida_actual < vida_antes:
+        dinero_ganado_defensor += DINERO_POR_GOLPE  # +10 por golpe, igual que las torres
+
+    if not objetivo.viva:
+        # Misma razón que en disparar_torres: sin esto, el cadáver se
+        # queda bloqueando la celda para siempre.
+        tablero.quitar(objetivo_ficha["fila"], objetivo_ficha["columna"])
+
+    return dinero_ganado_defensor
+
+
 # Esta es la función principal de esta parte. Se llama una vez cada turno
 # y hace que cada torre que esté viva ataque a la unidad enemiga más
 # cercana que tenga dentro de su alcance. Si a la torre le toca activar
 # su habilidad este turno, también la activa.
-def disparar_torres(torres_en_juego, unidades_en_juego):
+def disparar_torres(tablero, torres_en_juego, unidades_en_juego):
     dinero_ganado_defensor = 0
     for ficha_torre in torres_en_juego:
         torre = ficha_torre["torre"]
@@ -239,7 +402,21 @@ def disparar_torres(torres_en_juego, unidades_en_juego):
                 for ficha_en_rango in en_rango:
                     torre.activar_habilidad(ficha_en_rango["unidad"])
             else:
+                # La torre básica activa "Disparo doble" aquí: golpea
+                # otra vez al mismo objetivo. Eso puede ser justo el
+                # golpe que la mata, aunque el primer disparo (arriba)
+                # no haya alcanzado para matarla.
                 torre.activar_habilidad(objetivo)
+
+        # El chequeo de "¿murió?" se hace al final, después del golpe
+        # normal Y de la habilidad, porque cualquiera de los dos puede
+        # ser el que la mate. Si se revisaba solo después del primer
+        # golpe (como antes), una unidad podía morir por el Disparo
+        # Doble y quedar como cadáver bloqueando el tablero para
+        # siempre, sin que nadie la sacara de su celda.
+        for ficha_revisar in en_rango:
+            if not ficha_revisar["unidad"].viva:
+                tablero.quitar(ficha_revisar["fila"], ficha_revisar["columna"])
 
     return dinero_ganado_defensor
 
@@ -276,14 +453,12 @@ DINERO_POR_DESTRUIR = "costo"  # se usa el costo real del objeto
 
 
 def dinero_defensor_por_muertes(unidades_en_juego):
-    # Solo cuenta el dinero, NO elimina las unidades muertas
-    # Las unidades muertas se mantienen en la lista para persistir entre rondas
-    # (el tablero ya las quitó visualmente cuando murieron)
     dinero_ganado = 0
     for ficha in unidades_en_juego:
         unidad = ficha["unidad"]
-        if not unidad.viva:
+        if not unidad.viva and not unidad.cobrada:
             dinero_ganado += unidad.costo
+            unidad.cobrada = True  # no cobrar dos veces
     return dinero_ganado
 
 # Esta función le da dinero al atacante por dañar o destruir torres.
@@ -319,14 +494,13 @@ def dinero_atacante_por_base(base, vida_base_antes):
 # dinero y se revisa si alguien ganó la ronda.
 def ejecutar_turno(tablero, base, torres_en_juego, unidades_en_juego, dinero_atacante_actual, fila_base, columna_base):
     vida_base_antes = base.vida_actual
-    vidas_torres_antes = {id(ft["torre"]): ft["torre"].vida_actual for ft in torres_en_juego}
 
-    dinero_ganado_defensor = disparar_torres(torres_en_juego, unidades_en_juego)
-    mover_unidades(tablero, unidades_en_juego, fila_base, columna_base)
+    dinero_ganado_defensor = disparar_torres(tablero, torres_en_juego, unidades_en_juego)
+    dinero_ganado_defensor += disparar_base(tablero, base, fila_base, columna_base, unidades_en_juego)
+    dinero_ganado_atacante = mover_unidades(tablero, unidades_en_juego, fila_base, columna_base)
     mensajes_habilidades = activar_habilidades_unidades(unidades_en_juego)
 
     dinero_ganado_defensor += dinero_defensor_por_muertes(unidades_en_juego)
-    dinero_ganado_atacante  = dinero_atacante_por_torres(torres_en_juego, vidas_torres_antes)
     dinero_ganado_atacante += dinero_atacante_por_base(base, vida_base_antes)
 
     dinero_atacante_total = dinero_atacante_actual + dinero_ganado_atacante
@@ -338,4 +512,3 @@ def ejecutar_turno(tablero, base, torres_en_juego, unidades_en_juego, dinero_ata
         "mensajes_habilidades": mensajes_habilidades,
         "ganador_ronda": ganador_ronda,
     }
-
