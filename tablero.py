@@ -1,4 +1,5 @@
 import tkinter as tk
+from pathlib import Path
 from temas import TEMAS
 
 FILAS = 10
@@ -37,19 +38,15 @@ class Tablero:
 
 
 class TableroVisual:
-    # Esta clase dibuja el Tablero en pantalla. Ahora, además de pintar
-    # colores, intenta usar una imagen para cada cosa (torre, unidad,
-    # muro, base) según la facción. Si no encuentra la imagen, usa el
-    # color como antes, para que el juego nunca se rompa por una imagen
-    # faltante.
     def __init__(self, canvas, tablero, tema_nombre):
         self.canvas = canvas
         self.tablero = tablero
         self.tema_nombre = tema_nombre
-        self.tema = TEMAS[tema_nombre]
-        self.rectangulos = {}
-        self.imagenes_cache = {}  # guarda las imágenes ya cargadas, para no cargarlas de nuevo cada vez
-        self.imagenes_en_celdas = {}  # qué imagen está dibujada en cada celda ahora mismo
+        self.tema = TEMAS[tema_nombre]  # diccionario de colores de la facción elegida
+        self.rectangulos = {}  # guarda el id del rectángulo dibujado en cada (fila, columna)
+        self.imagenes_cache = {}
+        self.imagenes_en_celdas = {}
+        self.directorio_imagenes = Path(__file__).resolve().parent / "imagenes"
         self.dibujar_cuadricula()
 
     def dibujar_cuadricula(self):
@@ -66,14 +63,19 @@ class TableroVisual:
                 )
                 self.rectangulos[(fila, columna)] = rect_id
 
+    def _carpeta_tema(self):
+        mapeo = {
+            "Medieval": "MEDIEVAL",
+            "Futurista": "Futurista",
+            "Naturaleza": "Naturaleza",
+            "Acuático": "Naturaleza",
+        }
+        carpeta = mapeo.get(self.tema_nombre, "MEDIEVAL")
+        return self.directorio_imagenes / carpeta
+
     def nombre_archivo_de(self, objeto):
-        # Decide qué archivo de imagen le corresponde a un objeto del
-        # tablero. Las imágenes de base/muro/torre llevan al final la
-        # primera letra de la facción (M de Medieval, F de Futurista,
-        # N de Naturaleza). Las unidades son compartidas entre todas
-        # las facciones, así que van sin ninguna letra agregada.
         tipo_objeto = type(objeto).__name__.lower()
-        letra_faccion = self.tema_nombre[0].upper()  # M, F o N
+        letra_faccion = self.tema_nombre[0].upper() if self.tema_nombre in {"Medieval", "Futurista", "Naturaleza"} else "N"
 
         if tipo_objeto == "torre":
             return f"torre{letra_faccion}.png"
@@ -85,27 +87,37 @@ class TableroVisual:
             return f"{tipo_objeto}.png"
         return None
 
-    def cargar_imagen(self, nombre_archivo):
-        # Carga una imagen desde la carpeta imagenes/. Si ya se cargó
-        # antes, la reutiliza en vez de leerla de nuevo. Si el archivo
-        # no existe, devuelve None (y se usa el color de respaldo).
-        if nombre_archivo in self.imagenes_cache:
-            return self.imagenes_cache[nombre_archivo]
+    def ruta_imagen_de(self, objeto):
+        tipo_objeto = type(objeto).__name__.lower()
+        if tipo_objeto in ("soldado", "tanque", "rapida"):
+            return self.directorio_imagenes / "unidades" / self.nombre_archivo_de(objeto)
+        if tipo_objeto in ("torre", "base", "muro"):
+            return self._carpeta_tema() / self.nombre_archivo_de(objeto)
+        return None
 
-        ruta = f"imagenes/{nombre_archivo}"
+    def cargar_imagen(self, ruta_imagen):
+        key = str(ruta_imagen)
+        if key in self.imagenes_cache:
+            return self.imagenes_cache[key]
+
         try:
-            imagen = tk.PhotoImage(file=ruta)
+            imagen = tk.PhotoImage(file=str(ruta_imagen))
+            ancho_actual = imagen.width()
+            alto_actual = imagen.height()
+            factor_x = ancho_actual // TAMANO_CELDA
+            factor_y = alto_actual // TAMANO_CELDA
+            factor = max(int(factor_x // 1.4), int(factor_y // 1.4), 1)
+            imagen = imagen.subsample(factor, factor)
         except Exception:
             return None
 
-        self.imagenes_cache[nombre_archivo] = imagen
+        self.imagenes_cache[key] = imagen
         return imagen
 
     def actualizar_celda(self, fila, columna):
         objeto = self.tablero.obtener(fila, columna)
         rect_id = self.rectangulos[(fila, columna)]
 
-        # si había una imagen dibujada antes en esta celda, se borra primero
         if (fila, columna) in self.imagenes_en_celdas:
             self.canvas.delete(self.imagenes_en_celdas[(fila, columna)])
             del self.imagenes_en_celdas[(fila, columna)]
@@ -114,8 +126,18 @@ class TableroVisual:
             self.canvas.itemconfig(rect_id, fill=self.tema["fondo"])
             return
 
-        nombre_archivo = self.nombre_archivo_de(objeto)
-        imagen = self.cargar_imagen(nombre_archivo) if nombre_archivo else None
+        tipo_objeto = type(objeto).__name__.lower()
+        if tipo_objeto == "torre":
+            color = self.tema["torre"]
+        elif tipo_objeto == "base":
+            color = self.tema["base"]
+        elif tipo_objeto == "muro":
+            color = self.tema["muro"]
+        else:
+            color = self.tema["unidad"]
+
+        ruta_imagen = self.ruta_imagen_de(objeto)
+        imagen = self.cargar_imagen(ruta_imagen) if ruta_imagen else None
 
         if imagen is not None:
             x = columna * TAMANO_CELDA + TAMANO_CELDA // 2
@@ -123,20 +145,9 @@ class TableroVisual:
             imagen_id = self.canvas.create_image(x, y, image=imagen)
             self.imagenes_en_celdas[(fila, columna)] = imagen_id
         else:
-            # respaldo: si no hay imagen, se pinta el color como antes
-            tipo_objeto = type(objeto).__name__.lower()
-            if tipo_objeto == "torre":
-                color = self.tema["torre"]
-            elif tipo_objeto == "base":
-                color = self.tema["base"]
-            elif tipo_objeto == "muro":
-                color = self.tema["muro"]
-            else:
-                color = self.tema["unidad"]
             self.canvas.itemconfig(rect_id, fill=color)
 
     def refrescar_todo(self):
         for fila in range(FILAS):
             for columna in range(COLUMNAS):
                 self.actualizar_celda(fila, columna)
-                
