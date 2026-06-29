@@ -131,10 +131,3 @@ Cada tema cambia los colores, y el juego puede usar imágenes específicas para 
 - Durante el combate, las unidades atacantes usan un algoritmo BFS para encontrar el camino a la estructura defensiva más cercana y, cuando ya no quedan torres ni muros, atacan la base.
 - El sistema de dinero recompensa al atacante por dañar o destruir torres y la base, y al defensor por matar unidades enemigas.
 
-## Posibles mejoras
-
-- Agregar más tipos de unidades y torres.
-- Añadir animaciones de movimiento y ataques.
-- Integrar IA para jugar contra la computadora.
-- Mejorar el sistema de efectos especiales y habilidades.
-- Añadir sonidos y efectos visuales.
