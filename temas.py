@@ -7,7 +7,7 @@ TEMAS = {
         "torre": "#00BFFF", "muro": "#1C1C2E",
         "unidad": "#7DF9FF", "base": "#0A0A1A", "fondo": "#E0F7FF"
     },
-    "Acuático": {
+    "Naturaleza": {
         "torre": "#1E90FF", "muro": "#4682B4",
         "unidad": "#87CEEB", "base": "#00008B", "fondo": "#E0F8FF"
     },

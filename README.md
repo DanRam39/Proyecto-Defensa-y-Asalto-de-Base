@@ -126,7 +126,7 @@ Cada tema cambia los colores, y el juego puede usar imágenes específicas para 
 
 ## Detalles técnicos
 
-- Las unidades atacantes se colocan solo en las últimas columnas del tablero.
+- Las unidades atacantes se colocan solo en las últimas 3 columnas del tablero.
 - Las torres y muros del defensor se pueden colocar en cualquier celda vacía durante la fase de construcción.
 - Durante el combate, las unidades atacantes usan un algoritmo BFS para encontrar el camino a la estructura defensiva más cercana y, cuando ya no quedan torres ni muros, atacan la base.
 - El sistema de dinero recompensa al atacante por dañar o destruir torres y la base, y al defensor por matar unidades enemigas.

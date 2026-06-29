@@ -84,12 +84,12 @@ class TableroVisual:
         # Letra que se usa al final del nombre de archivo de cada
         # estructura, por ejemplo "torreM.png" para Medieval. No se usa
         # simplemente la primera letra del nombre del tema porque
-        # "Acuático" empezaría con "A" y el archivo real se llama con
+        
         # "N".
         letras = {
             "Medieval":  "M",
             "Futurista": "F",
-            "Acuático":  "N",
+            "Naturaleza":  "N",
         }
         return letras.get(self.tema_nombre, "M")
 

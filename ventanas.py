@@ -216,7 +216,7 @@ class VentanaJuego:
                     color="#a8dadc")
 
         card = self._card()
-        iconos = {"Medieval": "🏰", "Futurista": "🤖", "Acuático": "🌊"}
+        iconos = {"Medieval": "🏰", "Futurista": "🤖", "Naturaleza": "🌳"}
         for nombre, icono in iconos.items():
             n = nombre
             self._boton(card, f"{icono}  {nombre}",
