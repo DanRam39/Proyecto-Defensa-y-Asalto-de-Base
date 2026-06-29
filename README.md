@@ -11,7 +11,7 @@ Juego de estrategia por turnos en Python con interfaz gráfica usando Tkinter. D
 
 ## Requisitos
 
-- Python 3.8 o superior.
+- Python 3.10 o superior.
 - Tkinter (normalmente incluido en Python estándar).
 
 ## Ejecución

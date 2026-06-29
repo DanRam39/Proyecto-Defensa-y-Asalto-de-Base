@@ -6,14 +6,15 @@ FILAS = 10
 COLUMNAS = 16
 TAMANO_CELDA = 40  # píxeles por celda, ajustable
 
-
-import tkinter as tk
-from pathlib import Path
-from temas import TEMAS
-
-FILAS = 10
-COLUMNAS = 16
-TAMANO_CELDA = 40  # píxeles por celda, ajustable
+# Columna donde empieza la "zona prohibida" para el atacante, contada
+# desde la derecha: con 16 columnas (índices 0-15), la 4ta columna
+# contando desde el borde derecho es el índice 12. El atacante solo
+# puede colocar unidades en las columnas 13, 14 y 15 (la lógica real
+# de esa restricción vive en ventanas.py, en _click_ataque); esta
+# columna 12 se pinta de gris fijo, en los tres temas, únicamente para
+# marcar visualmente dónde está ese límite.
+COLUMNA_LIMITE_ATAQUE = COLUMNAS - 4
+COLOR_FRANJA_LIMITE = "#555555"
 
 
 class Tablero:
@@ -66,16 +67,23 @@ class TableroVisual:
         self.dibujar_cuadricula()
 
     def dibujar_cuadricula(self):
-        # Dibuja el fondo de cada celda, vacío por defecto
+        # Dibuja el fondo de cada celda. Todas usan el color de fondo
+        # del tema, salvo la columna límite del atacante (ver
+        # COLUMNA_LIMITE_ATAQUE), que siempre se pinta gris fijo, sin
+        # importar el tema elegido, para marcar claramente desde dónde
+        # ya no se pueden colocar más unidades.
         for fila in range(FILAS):
             for columna in range(COLUMNAS):
                 x1 = columna * TAMANO_CELDA
                 y1 = fila * TAMANO_CELDA
                 x2 = x1 + TAMANO_CELDA
                 y2 = y1 + TAMANO_CELDA
+                color_fondo = (COLOR_FRANJA_LIMITE
+                                if columna == COLUMNA_LIMITE_ATAQUE
+                                else self.tema["fondo"])
                 rect_id = self.canvas.create_rectangle(
                     x1, y1, x2, y2,
-                    fill=self.tema["fondo"],
+                    fill=color_fondo,
                     outline="gray"
                 )
                 self.rectangulos[(fila, columna)] = rect_id
@@ -177,7 +185,10 @@ class TableroVisual:
             del self.imagenes_en_celdas[(fila, columna)]
 
         if objeto is None:
-            self.canvas.itemconfig(rect_id, fill=self.tema["fondo"])
+            color_fondo = (COLOR_FRANJA_LIMITE
+                            if columna == COLUMNA_LIMITE_ATAQUE
+                            else self.tema["fondo"])
+            self.canvas.itemconfig(rect_id, fill=color_fondo)
             return
 
         # Usamos el nombre de la clase para saber qué color tocarle.

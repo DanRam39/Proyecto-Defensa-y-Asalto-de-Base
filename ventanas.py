@@ -396,6 +396,7 @@ class VentanaJuego:
         self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
         self.visual.refrescar_todo()  # ← muestra torres y muros de rondas anteriores
         self.canvas.bind("<Button-1>", self._click_construccion)
+        self.canvas.bind("<Button-3>", self._borrar_construccion)
 
         info = tk.Frame(self.contenedor, bg="#16213e")
         info.pack()
@@ -405,6 +406,9 @@ class VentanaJuego:
                     "Muro: Vida 50 · Bloquea el paso"]:
             tk.Label(info, text=txt, font=("Arial", 8),
                      bg="#16213e", fg="#a8dadc").pack(anchor="w", padx=8)
+        tk.Label(info, text="🖱 Clic derecho sobre una torre o muro para quitarlo y recuperar su dinero",
+                 font=("Arial", 8, "italic"),
+                 bg="#16213e", fg="#f4d03f").pack(anchor="w", padx=8, pady=(4, 0))
 
         self._boton(self.contenedor, "Listo ▶  Pasar al Atacante",
                     self._terminar_construccion, width=28)
@@ -438,6 +442,42 @@ class VentanaJuego:
         self.dinero_defensor_ronda -= costo
         self.lbl_dinero_def.config(
             text=f"💰 {self.dinero_defensor_ronda}")
+
+    def _borrar_construccion(self, evento):
+        # Clic derecho sobre una celda: si hay una torre o un muro ahí,
+        # se quita del tablero y se devuelve su costo al dinero del
+        # defensor, para que pueda reubicarlo o gastar esa plata en
+        # otra cosa. Solo funciona en esta fase de construcción, antes
+        # de que arranque el combate — no durante la pelea.
+        col  = evento.x // TAMANO_CELDA
+        fila = evento.y // TAMANO_CELDA
+        objeto = self.tablero.obtener(fila, col)
+        if objeto is None:
+            return  # no hay nada en esa celda, no hace nada
+
+        tipo_objeto = type(objeto).__name__.lower()
+        if tipo_objeto == "torre":
+            # Hay que sacarla también de la lista de seguimiento de
+            # torres, si no se queda registrada apuntando a una celda
+            # que ya está vacía.
+            self.torres_en_juego = [
+                ft for ft in self.torres_en_juego
+                if not (ft["fila"] == fila and ft["columna"] == col)
+            ]
+            costo = objeto.costo
+        elif tipo_objeto == "muro":
+            self.muros_en_juego = [
+                fm for fm in self.muros_en_juego
+                if not (fm["fila"] == fila and fm["columna"] == col)
+            ]
+            costo = objeto.costo
+        else:
+            return  # es la base u otra cosa que no se puede borrar
+
+        self.tablero.quitar(fila, col)
+        self.visual.actualizar_celda(fila, col)
+        self.dinero_defensor_ronda += costo
+        self.lbl_dinero_def.config(text=f"💰 {self.dinero_defensor_ronda}")
 
     def _crear_objeto(self, clave):
         if clave == "torre_basica":
@@ -496,6 +536,7 @@ class VentanaJuego:
         self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
         self.visual.refrescar_todo()  # ← muestra todo lo que ya hay, incluyendo unidades anteriores
         self.canvas.bind("<Button-1>", self._click_ataque)
+        self.canvas.bind("<Button-3>", self._borrar_ataque)
 
         info = tk.Frame(self.contenedor, bg="#16213e")
         info.pack()
@@ -503,6 +544,9 @@ class VentanaJuego:
                     "Unidad Rápida: Vida 60 · Daño 10 · Vel 2  |  Coloca en las 3 columnas de la derecha"]:
             tk.Label(info, text=txt, font=("Arial", 8),
                      bg="#16213e", fg="#a8dadc").pack(anchor="w", padx=8)
+        tk.Label(info, text="🖱 Clic derecho sobre una unidad para quitarla y recuperar su dinero",
+                 font=("Arial", 8, "italic"),
+                 bg="#16213e", fg="#f4d03f").pack(anchor="w", padx=8, pady=(4, 0))
 
         self._boton(self.contenedor, "¡Listo! ▶  Iniciar combate",
                     self._terminar_ataque, width=28)
@@ -535,6 +579,33 @@ class VentanaJuego:
             "unidad": unidad
         })
         self.dinero_atacante_ronda -= costo
+        self.lbl_dinero_atk.config(text=f"💰 {self.dinero_atacante_ronda}")
+
+    def _borrar_ataque(self, evento):
+        # Igual que _borrar_construccion, pero para las unidades del
+        # atacante: clic derecho sobre una celda con una unidad propia
+        # la quita del tablero y devuelve su costo, para poder ponerla
+        # en otro lado o ahorrar esa plata para otra unidad. Solo
+        # funciona en esta fase de colocación, antes del combate.
+        col  = evento.x // TAMANO_CELDA
+        fila = evento.y // TAMANO_CELDA
+        objeto = self.tablero.obtener(fila, col)
+        if objeto is None:
+            return  # no hay nada en esa celda, no hace nada
+
+        tipo_objeto = type(objeto).__name__.lower()
+        if tipo_objeto not in ("soldado", "tanque", "rapida"):
+            return  # no es una unidad del atacante (es base, torre o muro)
+
+        self.unidades_en_juego = [
+            fu for fu in self.unidades_en_juego
+            if not (fu["fila"] == fila and fu["columna"] == col)
+        ]
+        costo = objeto.costo
+
+        self.tablero.quitar(fila, col)
+        self.visual.actualizar_celda(fila, col)
+        self.dinero_atacante_ronda += costo
         self.lbl_dinero_atk.config(text=f"💰 {self.dinero_atacante_ronda}")
 
     def _crear_unidad(self, clave):
