@@ -10,6 +10,7 @@ from atacantes import Soldado, Tanque, Rapida
 from usuarios import iniciar_sesion, registrar, actualizar_victoria
 from ranking import top_defensores, top_atacantes, guardar_puntaje
 from temas import TEMAS
+import sonidos
 
 
 class VentanaJuego:
@@ -94,6 +95,7 @@ class VentanaJuego:
 
     def mostrar_menu_principal(self):
         self.limpiar()
+        sonidos.reproducir("menu")
         self.contenedor.configure(bg="#1a1a2e")
 
         tk.Label(self.contenedor,
@@ -116,6 +118,7 @@ class VentanaJuego:
 
     def _pantalla_login(self, titulo, callback_ok):
         self.limpiar()
+        sonidos.reproducir("login")
         self.contenedor.configure(bg="#1a1a2e")
         self._titulo(self.contenedor, titulo, size=18)
 
@@ -150,6 +153,7 @@ class VentanaJuego:
 
     def _pantalla_registro(self, titulo_origen, callback_ok):
         self.limpiar()
+        sonidos.reproducir("login")
         self.contenedor.configure(bg="#1a1a2e")
         self._titulo(self.contenedor, "Crear cuenta", size=18)
 
@@ -204,6 +208,7 @@ class VentanaJuego:
 
     def mostrar_seleccion_tema(self):
         self.limpiar()
+        sonidos.reproducir("seleccion_roles")
         self.contenedor.configure(bg="#1a1a2e")
         self._titulo(self.contenedor, "Elige el tema de la partida", size=18)
         self._label(self.contenedor,
@@ -231,6 +236,7 @@ class VentanaJuego:
 
     def mostrar_seleccion_defensor(self):
         self.limpiar()
+        sonidos.reproducir("seleccion_roles")
         self.contenedor.configure(bg="#1a1a2e")
         self._titulo(self.contenedor, "¿Quién va a defender?", size=18)
         self._label(self.contenedor,
@@ -335,6 +341,7 @@ class VentanaJuego:
 
     def _mostrar_transicion(self, jugador, rol, callback):
         self.limpiar()
+        sonidos.reproducir("transicion")
         self.contenedor.configure(bg="#1a1a2e")
         self._titulo(self.contenedor, f"Ronda {self.numero_ronda}", size=20)
         tk.Label(self.contenedor,
@@ -351,6 +358,7 @@ class VentanaJuego:
 
     def mostrar_construccion(self):
         self.limpiar()
+        sonidos.reproducir("construccion")
         self.contenedor.configure(bg="#1a1a2e")
         self.opcion_seleccionada = None
 
@@ -452,6 +460,7 @@ class VentanaJuego:
 
     def mostrar_ataque(self):
         self.limpiar()
+        sonidos.reproducir("ataque")
         self.contenedor.configure(bg="#1a1a2e")
         self.opcion_seleccionada = None
 
@@ -545,6 +554,7 @@ class VentanaJuego:
 
     def mostrar_combate(self):
         self.limpiar()
+        sonidos.reproducir("combate")
         self.contenedor.configure(bg="#1a1a2e")
 
         top = tk.Frame(self.contenedor, bg="#1a1a2e")
@@ -663,6 +673,7 @@ class VentanaJuego:
         # combate (que se borra al pasar de pantalla) y era imposible
         # de leer a tiempo.
         self.limpiar()
+        sonidos.reproducir("resultado_ronda")
         self.contenedor.configure(bg="#1a1a2e")
 
         if ganador_ronda == "defensor":
@@ -714,6 +725,7 @@ class VentanaJuego:
             pass
 
         self.limpiar()
+        sonidos.reproducir("fin_partida")
         self.contenedor.configure(bg="#1a1a2e")
         self._titulo(self.contenedor, "¡Fin de la partida!", size=24)
         tk.Label(self.contenedor,
@@ -736,6 +748,7 @@ class VentanaJuego:
 
     def mostrar_ranking(self):
         self.limpiar()
+        sonidos.reproducir("ranking")
         self.contenedor.configure(bg="#1a1a2e")
         self._titulo(self.contenedor, "🏆  Ranking de Jugadores", size=20)
 

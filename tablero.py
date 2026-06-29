@@ -1,4 +1,14 @@
 import tkinter as tk
+from pathlib import Path
+from temas import TEMAS
+
+FILAS = 10
+COLUMNAS = 16
+TAMANO_CELDA = 40  # píxeles por celda, ajustable
+
+
+import tkinter as tk
+from pathlib import Path
 from temas import TEMAS
 
 FILAS = 10
@@ -39,11 +49,20 @@ class Tablero:
 class TableroVisual:
     # Esta clase se encarga SOLO de dibujar el Tablero en pantalla.
     # Recibe un Tablero y un Canvas donde dibujar.
+    #
+    # Antes solo pintaba un cuadrado de color por cada cosa (torre, base,
+    # muro, unidad). Ahora primero intenta dibujar una imagen .png; si
+    # no la encuentra por algún motivo, cae de vuelta al color plano de
+    # siempre, así el juego nunca se rompe por una imagen faltante.
     def __init__(self, canvas, tablero, tema_nombre):
         self.canvas = canvas
         self.tablero = tablero
+        self.tema_nombre = tema_nombre
         self.tema = TEMAS[tema_nombre]  # diccionario de colores de la facción elegida
         self.rectangulos = {}  # guarda el id del rectángulo dibujado en cada (fila, columna)
+        self.imagenes_cache = {}       # evita volver a leer del disco la misma imagen muchas veces
+        self.imagenes_en_celdas = {}   # guarda el id de la imagen dibujada en cada (fila, columna)
+        self.directorio_imagenes = Path(__file__).resolve().parent / "imagenes"
         self.dibujar_cuadricula()
 
     def dibujar_cuadricula(self):
@@ -61,28 +80,132 @@ class TableroVisual:
                 )
                 self.rectangulos[(fila, columna)] = rect_id
 
+    def _letra_tema(self):
+        # Letra que se usa al final del nombre de archivo de cada
+        # estructura, por ejemplo "torreM.png" para Medieval. No se usa
+        # simplemente la primera letra del nombre del tema porque
+        # "Acuático" empezaría con "A" y el archivo real se llama con
+        # "N".
+        letras = {
+            "Medieval":  "M",
+            "Futurista": "F",
+            "Acuático":  "N",
+        }
+        return letras.get(self.tema_nombre, "M")
+
+    def nombre_archivo_de(self, objeto):
+        # Decide qué nombre de archivo .png le corresponde a este
+        # objeto según su tipo de clase y, si es una estructura
+        # (torre/base/muro), según el tema visual actual.
+        tipo_objeto = type(objeto).__name__.lower()
+
+        if tipo_objeto == "torre":
+            # Cada tipo de torre (básica/pesada/mágica) tiene su propia
+            # imagen distinta dentro del mismo tema. La básica sigue
+            # usando el archivo de siempre (torreM.png); la pesada usa
+            # el archivo con sufijo "3" (torreM3.png) y la mágica el de
+            # sufijo "2" (torreM2.png) — así están nombrados los
+            # archivos que llegaron para esta actualización.
+            letra = self._letra_tema()
+            if objeto.tipo == "pesada":
+                return f"torre{letra}3.png"
+            elif objeto.tipo == "magica":
+                return f"torre{letra}2.png"
+            else:  # "basica"
+                return f"torre{letra}.png"
+        elif tipo_objeto == "base":
+            return f"base{self._letra_tema()}.png"
+        elif tipo_objeto == "muro":
+            return f"muro{self._letra_tema()}.png"
+        elif tipo_objeto in ("soldado", "tanque", "rapida"):
+            # Las unidades no cambian de imagen según el tema: el mismo
+            # soldado se ve igual sin importar la facción del defensor.
+            return f"{tipo_objeto}.png"
+        return None
+
+    def ruta_imagen_de(self, objeto):
+        # Todas las imágenes (estructuras y unidades) viven juntas en
+        # una sola carpeta imagenes/, sin subcarpetas. Los nombres de
+        # archivo ya son únicos entre sí (torreM.png, baseF.png,
+        # soldado.png, etc.), así que alcanza con esta única carpeta.
+        nombre_archivo = self.nombre_archivo_de(objeto)
+        if nombre_archivo is None:
+            return None
+        return self.directorio_imagenes / nombre_archivo
+
+    def cargar_imagen(self, ruta_imagen):
+        # Carga un archivo .png del disco y lo reduce de tamaño para
+        # que entre en una celda del tablero. Las imágenes ya cargadas
+        # se guardan en self.imagenes_cache para no leer el mismo
+        # archivo del disco una y otra vez cada vez que se repinta el
+        # tablero (eso sería lento y innecesario).
+        clave = str(ruta_imagen)
+        if clave in self.imagenes_cache:
+            return self.imagenes_cache[clave]
+
+        try:
+            imagen = tk.PhotoImage(file=str(ruta_imagen))
+            ancho_actual = imagen.width()
+            alto_actual = imagen.height()
+            # .subsample(n) reduce la imagen n veces. Se calcula n a
+            # partir de qué tan grande es la imagen original comparada
+            # con el tamaño de una celda, para que termine entrando.
+            factor_x = ancho_actual // TAMANO_CELDA
+            factor_y = alto_actual // TAMANO_CELDA
+            factor = max(int(factor_x // 1.4), int(factor_y // 1.4), 1)
+            imagen = imagen.subsample(factor, factor)
+        except Exception:
+            # Si el archivo no existe o está corrupto, no se rompe el
+            # juego: simplemente no hay imagen para mostrar, y
+            # actualizar_celda() va a caer al color plano de respaldo.
+            return None
+
+        self.imagenes_cache[clave] = imagen
+        return imagen
+
     def actualizar_celda(self, fila, columna):
         # Vuelve a pintar una celda según lo que haya ahí en este momento.
         # Se llama cada vez que algo cambia: se coloca, se mueve o muere algo.
         objeto = self.tablero.obtener(fila, columna)
         rect_id = self.rectangulos[(fila, columna)]
 
-        if objeto is None:
-            color = self.tema["fondo"]
-        else:
-            # Usamos el nombre de la clase para saber qué color tocarle.
-            # Esto asume que las clases se llaman Torre, Unidad, Base, Muro.
-            tipo_objeto = type(objeto).__name__.lower()
-            if tipo_objeto == "torre":
-                color = self.tema["torre"]
-            elif tipo_objeto == "base":
-                color = self.tema["base"]
-            elif tipo_objeto == "muro":
-                color = self.tema["muro"]
-            else:
-                color = self.tema["unidad"]  # cualquier subclase de Unidad
+        # Si esta celda ya tenía una imagen dibujada de antes, hay que
+        # borrarla primero. Sin esto, las imágenes viejas se quedarían
+        # apiladas unas sobre otras en el canvas para siempre.
+        if (fila, columna) in self.imagenes_en_celdas:
+            self.canvas.delete(self.imagenes_en_celdas[(fila, columna)])
+            del self.imagenes_en_celdas[(fila, columna)]
 
-        self.canvas.itemconfig(rect_id, fill=color)
+        if objeto is None:
+            self.canvas.itemconfig(rect_id, fill=self.tema["fondo"])
+            return
+
+        # Usamos el nombre de la clase para saber qué color tocarle.
+        # Esto asume que las clases se llaman Torre, Unidad, Base, Muro.
+        tipo_objeto = type(objeto).__name__.lower()
+        if tipo_objeto == "torre":
+            color = self.tema["torre"]
+        elif tipo_objeto == "base":
+            color = self.tema["base"]
+        elif tipo_objeto == "muro":
+            color = self.tema["muro"]
+        else:
+            color = self.tema["unidad"]  # cualquier subclase de Unidad
+
+        ruta_imagen = self.ruta_imagen_de(objeto)
+        imagen = self.cargar_imagen(ruta_imagen) if ruta_imagen else None
+
+        if imagen is not None:
+            # Hay imagen disponible: se dibuja centrada en la celda,
+            # encima del rectángulo (que queda invisible debajo).
+            x = columna * TAMANO_CELDA + TAMANO_CELDA // 2
+            y = fila * TAMANO_CELDA + TAMANO_CELDA // 2
+            imagen_id = self.canvas.create_image(x, y, image=imagen)
+            self.imagenes_en_celdas[(fila, columna)] = imagen_id
+        else:
+            # No hay imagen (todavía no se agregó el archivo, o no se
+            # encontró): se usa el color plano de siempre, como respaldo.
+            self.canvas.itemconfig(rect_id, fill=color)
 
     def refrescar_todo(self):
         # Repinta el tablero completo, útil después de varios cambios a la vez
