@@ -4,8 +4,7 @@ from tkinter import messagebox
 from tablero import Tablero, TableroVisual, FILAS, COLUMNAS, TAMANO_CELDA
 from defensa import Base, Torre
 from combate import (Muro, disparar_torres, disparar_base, mover_unidades,
-                     activar_habilidades_unidades, dinero_defensor_por_muertes,
-                     dinero_atacante_por_torres, dinero_atacante_por_base)
+                     activar_habilidades_unidades, dinero_defensor_por_muertes)
 from atacantes import Soldado, Tanque, Rapida
 from usuarios import iniciar_sesion, registrar, actualizar_victoria
 from ranking import top_defensores, top_atacantes, guardar_puntaje
@@ -224,7 +223,9 @@ class VentanaJuego:
                         color="#0f3460")
 
     def _elegir_tema(self, tema):
-        # Si el tema no existe en TEMAS (ej. Acuático no estaba), usar Medieval
+        # Salvaguarda: si por algún motivo llegara un nombre de tema
+        # que no existe en TEMAS, se usa Medieval por defecto en vez
+        # de romper el juego.
         if tema not in TEMAS:
             tema = "Medieval"
         self.tema_nombre = tema

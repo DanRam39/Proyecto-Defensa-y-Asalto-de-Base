@@ -24,11 +24,6 @@ class Unidad:
     def descongelar(self):
         self.velocidad_congelada = False
 
-#lo que hace es mover la unidad a la izquierda restando columnas según la velocidad. 
-    def mover(self, fila, col):
-        # Avanza hacia la base (hacia la izquierda en el mapa)
-        return fila, col - self.velocidad
-
 #habilidad especial 
     def activar_habilidad(self):
         pass  # cada subclase define la suya

@@ -91,9 +91,9 @@ class TableroVisual:
     def _letra_tema(self):
         # Letra que se usa al final del nombre de archivo de cada
         # estructura, por ejemplo "torreM.png" para Medieval. No se usa
-        # simplemente la primera letra del nombre del tema porque
-        
-        # "N".
+        # simplemente la primera letra del nombre del tema porque no
+        # siempre coincide con la letra real del archivo (por eso esta
+        # tabla explícita, en vez de tomar tema_nombre[0]).
         letras = {
             "Medieval":  "M",
             "Futurista": "F",

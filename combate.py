@@ -1,10 +1,9 @@
 #aquí se trabaja la lógica del combate 
 
-from defensa import Base , Torre 
-torres_en_juego = [] #guarda cada torre puesta en el mapa junto con su fila y columna 
-#se creó esta nueva clase ya que hacia falta para que las unidades tengan algo contra que chocar al moverse
-
+from defensa import Base, Torre
 from collections import deque
+
+#se creó esta nueva clase ya que hacia falta para que las unidades tengan algo contra que chocar al moverse
 
 class Muro:
     def __init__(self, vida, costo):
@@ -45,8 +44,6 @@ def obstaculo_mas_cercano(tablero, fila, columna):
             return fila_vecina, columna_vecina, obstaculo
 
     return None
-
-from collections import deque
 
 def encontrar_siguiente_paso_a_estructura(tablero, fila_inicio, columna_inicio):
     """BFS hacia la Torre o Muro más cercana.
@@ -200,7 +197,7 @@ def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
                 obj = tablero.obtener(fv, cv)
                 if isinstance(obj, (Torre, Muro)):
                     obj.recibir_daño(unidad.daño)
-                    dinero_ganado_atacante += 10       # +10 por golpear
+                    dinero_ganado_atacante += DINERO_POR_GOLPE  # +10 por golpear
                     if obj.esta_destruida():
                         dinero_ganado_atacante += obj.costo  # +costo al destruir
                         tablero.quitar(fv, cv)
@@ -242,7 +239,7 @@ def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
                 obj = tablero.obtener(fv, cv)
                 if isinstance(obj, Base):
                     obj.recibir_daño(unidad.daño)
-                    dinero_ganado_atacante += 10       # +10 por golpear la base
+                    dinero_ganado_atacante += DINERO_POR_GOLPE  # +10 por golpear la base
                     ataco = True
                     break
 
@@ -290,29 +287,6 @@ def mover_unidades(tablero, unidades_en_juego, fila_base, columna_base):
         ficha["columna"] = columna_actual
 
     return dinero_ganado_atacante
-
-#estas son para revisar si alguien ganó la ronda
-def gano_atacante(base):
-    return base.esta_destruida() #returna true si la base si fue destruida
-
-
-def gano_defensor(base, dinero_atacante, unidades_en_juego):
-    if base.esta_destruida():
-        return False #si la base está destruida el defensor no puede ser el ganador
-
-    unidades_vivas = [f for f in unidades_en_juego if f["unidad"].viva] #filtra la lista para ver las unidades q siguen vivas
-    sin_unidades = len(unidades_vivas) == 0 #cuando el atacante ya no tiene nada en el mapa
-    sin_dinero = dinero_atacante <= 0 #cuando ya no tiene plata para generar más unidades
-
-    return sin_unidades and sin_dinero #el defensor gana si ambas se cumplen simultaneamente
-
-#en esta se unen las funciones anteriores para no llamarlas por separado
-def verificar_victoria_ronda(base, dinero_atacante, unidades_en_juego):
-    if gano_atacante(base):
-        return "atacante"
-    if gano_defensor(base, dinero_atacante, unidades_en_juego):
-        return "defensor"
-    return None
 
 #DISPARO DE TORRES........................................
 
@@ -438,20 +412,13 @@ def activar_habilidades_unidades(unidades_en_juego):
     return mensajes  # al final devuelve todos los mensajes para mostrarlos en pantalla
 
 #Ganancia de dinero por daños.............................
-DINERO_POR_DAÑAR_TORRE_O_BASE = 5
-DINERO_EXTRA_POR_DESTRUIR_TORRE = 20
+DINERO_POR_GOLPE = 10  # +10 cada vez que un disparo o ataque hace daño
 
 
 # Esta función le da dinero al defensor por cada unidad enemiga que
-# haya muerto. La cantidad depende del tipo de unidad: le damos la
-# mitad de lo que costaba comprarla. También se encarga de sacar de
-# la lista a las unidades que ya murieron, para no cobrarlas dos veces
-# en un turno futuro.
-# Constantes de dinero
-DINERO_POR_GOLPE = 10
-DINERO_POR_DESTRUIR = "costo"  # se usa el costo real del objeto
-
-
+# haya muerto: el costo completo de comprar esa unidad. También se
+# encarga de marcar como "cobrada" a cada unidad muerta, para no
+# pagarla dos veces si se vuelve a revisar en un turno futuro.
 def dinero_defensor_por_muertes(unidades_en_juego):
     dinero_ganado = 0
     for ficha in unidades_en_juego:
@@ -460,55 +427,3 @@ def dinero_defensor_por_muertes(unidades_en_juego):
             dinero_ganado += unidad.costo
             unidad.cobrada = True  # no cobrar dos veces
     return dinero_ganado
-
-# Esta función le da dinero al atacante por dañar o destruir torres.
-# Para saber si una torre recibió daño este turno, comparamos su vida
-# de antes contra su vida de ahora. Por eso necesita el diccionario
-# vidas_antes, que hay que armar justo antes de mover unidades y
-# disparar torres, guardando cuánta vida tenía cada una en ese momento.
-def dinero_atacante_por_torres(torres_en_juego, vidas_antes):
-    dinero_ganado = 0
-    for ficha_torre in torres_en_juego:
-        torre = ficha_torre["torre"]
-        vida_anterior = vidas_antes.get(id(torre))
-        if vida_anterior is None:
-            continue
-        if torre.vida_actual < vida_anterior:
-            dinero_ganado += DINERO_POR_GOLPE  # +10 por cada golpe
-            if torre.esta_destruida():
-                dinero_ganado += torre.costo  # +costo de la torre al destruirla
-    return dinero_ganado
-
-
-# Misma idea que con las torres, pero para la base central.
-# vida_base_antes es la vida que tenía la base antes del turno.
-def dinero_atacante_por_base(base, vida_base_antes):
-    if base.vida_actual < vida_base_antes:
-        return DINERO_POR_GOLPE  # +10 por golpear la base
-    return 0
-
-#turno completo.............
-# Esta función ejecuta un turno completo, llamando todo lo de arriba
-# en orden: primero disparan las torres, luego se mueven las unidades,
-# luego activan su habilidad si les toca, y al final se reparte el
-# dinero y se revisa si alguien ganó la ronda.
-def ejecutar_turno(tablero, base, torres_en_juego, unidades_en_juego, dinero_atacante_actual, fila_base, columna_base):
-    vida_base_antes = base.vida_actual
-
-    dinero_ganado_defensor = disparar_torres(tablero, torres_en_juego, unidades_en_juego)
-    dinero_ganado_defensor += disparar_base(tablero, base, fila_base, columna_base, unidades_en_juego)
-    dinero_ganado_atacante = mover_unidades(tablero, unidades_en_juego, fila_base, columna_base)
-    mensajes_habilidades = activar_habilidades_unidades(unidades_en_juego)
-
-    dinero_ganado_defensor += dinero_defensor_por_muertes(unidades_en_juego)
-    dinero_ganado_atacante += dinero_atacante_por_base(base, vida_base_antes)
-
-    dinero_atacante_total = dinero_atacante_actual + dinero_ganado_atacante
-    ganador_ronda = verificar_victoria_ronda(base, dinero_atacante_total, unidades_en_juego)
-
-    return {
-        "dinero_ganado_defensor": dinero_ganado_defensor,
-        "dinero_ganado_atacante": dinero_ganado_atacante,
-        "mensajes_habilidades": mensajes_habilidades,
-        "ganador_ronda": ganador_ronda,
-    }
