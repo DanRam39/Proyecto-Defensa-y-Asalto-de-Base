@@ -24,7 +24,11 @@ class VentanaJuego:
         # Estado de sesión
         self.nombre_j1 = None
         self.nombre_j2 = None
-        self.tema_nombre = "Medieval"
+        # Cada rol tiene su propia facción y no pueden ser la misma (se
+        # eligen en pantallas separadas). Las estructuras del defensor y
+        # las unidades del atacante se dibujan con su facción respectiva.
+        self.faccion_defensor = "Medieval"
+        self.faccion_atacante = "Futurista"
         self.nombre_defensor = None
         self.nombre_atacante = None
 
@@ -198,38 +202,67 @@ class VentanaJuego:
                     "El Jugador 2 debe usar una cuenta diferente.")
                 return
             self.nombre_j2 = nombre
-            self.mostrar_seleccion_tema()
+            self.mostrar_seleccion_defensor()
         self._pantalla_login("Jugador 2 — Iniciar sesión", ok_j2)
 
     # ───────────────────────────────────────────────────────
-    #  SELECCIÓN DE TEMA
+    #  SELECCIÓN DE FACCIÓN (una por jugador, no pueden repetirse)
     # ───────────────────────────────────────────────────────
 
-    def mostrar_seleccion_tema(self):
+    # Iconos de cada facción disponible. Se usan en las dos pantallas de
+    # selección (defensor y atacante).
+    ICONOS_FACCION = {"Medieval": "🏰", "Futurista": "🤖", "Naturaleza": "🌳"}
+
+    def _pantalla_faccion(self, rol, jugador, excluir, callback):
+        # Pantalla genérica para que un jugador elija su facción. 'excluir'
+        # es la facción que ya tomó el otro jugador (o None si todavía
+        # nadie eligió): esa opción no se muestra, así se garantiza que el
+        # atacante y el defensor nunca queden con la misma facción.
         self.limpiar()
         sonidos.reproducir("seleccion_roles")
         self.contenedor.configure(bg="#1a1a2e")
-        self._titulo(self.contenedor, "Elige el tema de la partida", size=18)
+        self._titulo(self.contenedor, f"Facción del {rol}", size=18)
         self._label(self.contenedor,
-                    "Ambos jugadores jugarán con el mismo tema visual.",
+                    f"{jugador}, elige tu facción.\n"
+                    "Cambia el aspecto visual de tus piezas en el tablero.",
                     color="#a8dadc")
+        if excluir is not None:
+            self._label(self.contenedor,
+                        f"El defensor ya eligió «{excluir}», elige una distinta.",
+                        color="#f4d03f")
 
         card = self._card()
-        iconos = {"Medieval": "🏰", "Futurista": "🤖", "Naturaleza": "🌳"}
-        for nombre, icono in iconos.items():
+        for nombre, icono in self.ICONOS_FACCION.items():
+            if nombre == excluir:
+                continue  # no se puede repetir la facción del rival
             n = nombre
             self._boton(card, f"{icono}  {nombre}",
-                        lambda t=n: self._elegir_tema(t),
+                        lambda f=n: callback(f),
                         color="#0f3460")
 
-    def _elegir_tema(self, tema):
-        # Salvaguarda: si por algún motivo llegara un nombre de tema
-        # que no existe en TEMAS, se usa Medieval por defecto en vez
-        # de romper el juego.
-        if tema not in TEMAS:
-            tema = "Medieval"
-        self.tema_nombre = tema
-        self.mostrar_seleccion_defensor()
+    def mostrar_seleccion_faccion_defensor(self):
+        self._pantalla_faccion(
+            "Defensor 🛡", self.nombre_defensor, excluir=None,
+            callback=self._faccion_defensor_elegida)
+
+    def _faccion_defensor_elegida(self, faccion):
+        if faccion not in TEMAS:          # salvaguarda
+            faccion = "Medieval"
+        self.faccion_defensor = faccion
+        self.mostrar_seleccion_faccion_atacante()
+
+    def mostrar_seleccion_faccion_atacante(self):
+        self._pantalla_faccion(
+            "Atacante ⚔", self.nombre_atacante, excluir=self.faccion_defensor,
+            callback=self._faccion_atacante_elegida)
+
+    def _faccion_atacante_elegida(self, faccion):
+        # No debería poder elegir la del defensor (no se muestra el botón),
+        # pero por seguridad se cae a otra facción si llegara igual.
+        if faccion not in TEMAS or faccion == self.faccion_defensor:
+            faccion = next(f for f in TEMAS if f != self.faccion_defensor)
+        self.faccion_atacante = faccion
+        self.iniciar_ronda()
 
     # ───────────────────────────────────────────────────────
     #  SELECCIÓN DE ROL
@@ -266,7 +299,10 @@ class VentanaJuego:
         self.torres_en_juego = []
         self.muros_en_juego = []
         self.unidades_en_juego = []
-        self.iniciar_ronda()
+        # Ya se conocen los roles: ahora cada jugador elige su facción
+        # (primero el defensor, luego el atacante con la del defensor
+        # excluida). La última pantalla de facción llama a iniciar_ronda().
+        self.mostrar_seleccion_faccion_defensor()
 
     # ───────────────────────────────────────────────────────
     #  FLUJO DE RONDA
@@ -394,7 +430,8 @@ class VentanaJuego:
                                 height=FILAS * TAMANO_CELDA,
                                 bg="#1a1a2e", highlightthickness=0)
         self.canvas.pack(pady=4)
-        self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
+        self.visual = TableroVisual(self.canvas, self.tablero,
+                                    self.faccion_defensor, self.faccion_atacante)
         self.visual.refrescar_todo()  # ← muestra torres y muros de rondas anteriores
         self.canvas.bind("<Button-1>", self._click_construccion)
         self.canvas.bind("<Button-3>", self._borrar_construccion)
@@ -534,7 +571,8 @@ class VentanaJuego:
                                 height=FILAS * TAMANO_CELDA,
                                 bg="#1a1a2e", highlightthickness=0)
         self.canvas.pack(pady=4)
-        self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
+        self.visual = TableroVisual(self.canvas, self.tablero,
+                                    self.faccion_defensor, self.faccion_atacante)
         self.visual.refrescar_todo()  # ← muestra todo lo que ya hay, incluyendo unidades anteriores
         self.canvas.bind("<Button-1>", self._click_ataque)
         self.canvas.bind("<Button-3>", self._borrar_ataque)
@@ -643,7 +681,8 @@ class VentanaJuego:
                                 height=FILAS * TAMANO_CELDA,
                                 bg="#1a1a2e", highlightthickness=0)
         self.canvas.pack(pady=4)
-        self.visual = TableroVisual(self.canvas, self.tablero, self.tema_nombre)
+        self.visual = TableroVisual(self.canvas, self.tablero,
+                                    self.faccion_defensor, self.faccion_atacante)
         self.visual.refrescar_todo()
 
         self.log = tk.Text(self.contenedor, height=5, width=86,

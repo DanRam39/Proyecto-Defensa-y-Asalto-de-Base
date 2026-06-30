@@ -55,11 +55,18 @@ class TableroVisual:
     # muro, unidad). Ahora primero intenta dibujar una imagen .png; si
     # no la encuentra por algún motivo, cae de vuelta al color plano de
     # siempre, así el juego nunca se rompe por una imagen faltante.
-    def __init__(self, canvas, tablero, tema_nombre):
+    def __init__(self, canvas, tablero, faccion_estructuras, faccion_unidades):
         self.canvas = canvas
         self.tablero = tablero
-        self.tema_nombre = tema_nombre
-        self.tema = TEMAS[tema_nombre]  # diccionario de colores de la facción elegida
+        # El defensor y el atacante pueden tener facciones DISTINTAS. Las
+        # estructuras (torres, muros, base) se dibujan con la facción del
+        # defensor y las unidades atacantes con la facción del atacante.
+        # Por eso se guardan dos facciones por separado, en vez de un único
+        # tema compartido por todo el tablero como antes.
+        self.faccion_estructuras = faccion_estructuras  # defensor: torre/muro/base
+        self.faccion_unidades = faccion_unidades        # atacante: unidades
+        self.tema_estructuras = TEMAS[faccion_estructuras]  # colores del defensor
+        self.tema_unidades = TEMAS[faccion_unidades]        # colores del atacante
         self.rectangulos = {}  # guarda el id del rectángulo dibujado en cada (fila, columna)
         self.imagenes_cache = {}       # evita volver a leer del disco la misma imagen muchas veces
         self.imagenes_en_celdas = {}   # guarda el id de la imagen dibujada en cada (fila, columna)
@@ -80,7 +87,7 @@ class TableroVisual:
                 y2 = y1 + TAMANO_CELDA
                 color_fondo = (COLOR_FRANJA_LIMITE
                                 if columna == COLUMNA_LIMITE_ATAQUE
-                                else self.tema["fondo"])
+                                else self.tema_estructuras["fondo"])
                 rect_id = self.canvas.create_rectangle(
                     x1, y1, x2, y2,
                     fill=color_fondo,
@@ -88,18 +95,19 @@ class TableroVisual:
                 )
                 self.rectangulos[(fila, columna)] = rect_id
 
-    def _letra_tema(self):
+    def _letra_de(self, faccion):
         # Letra que se usa al final del nombre de archivo de cada
         # estructura, por ejemplo "torreM.png" para Medieval. No se usa
-        # simplemente la primera letra del nombre del tema porque no
+        # simplemente la primera letra del nombre de la facción porque no
         # siempre coincide con la letra real del archivo (por eso esta
-        # tabla explícita, en vez de tomar tema_nombre[0]).
+        # tabla explícita). Recibe la facción como parámetro porque ahora
+        # estructuras y unidades pueden usar facciones diferentes.
         letras = {
             "Medieval":  "M",
             "Futurista": "F",
             "Naturaleza":  "N",
         }
-        return letras.get(self.tema_nombre, "M")
+        return letras.get(faccion, "M")
 
     def nombre_archivo_de(self, objeto):
         # Decide qué nombre de archivo .png le corresponde a este
@@ -109,12 +117,10 @@ class TableroVisual:
 
         if tipo_objeto == "torre":
             # Cada tipo de torre (básica/pesada/mágica) tiene su propia
-            # imagen distinta dentro del mismo tema. La básica sigue
-            # usando el archivo de siempre (torreM.png); la pesada usa
-            # el archivo con sufijo "3" (torreM3.png) y la mágica el de
-            # sufijo "2" (torreM2.png) — así están nombrados los
-            # archivos que llegaron para esta actualización.
-            letra = self._letra_tema()
+            # imagen distinta dentro de la facción del DEFENSOR. La básica
+            # usa el archivo base (torreM.png); la pesada el de sufijo "3"
+            # (torreM3.png) y la mágica el de sufijo "2" (torreM2.png).
+            letra = self._letra_de(self.faccion_estructuras)
             if objeto.tipo == "pesada":
                 return f"torre{letra}3.png"
             elif objeto.tipo == "magica":
@@ -122,13 +128,18 @@ class TableroVisual:
             else:  # "basica"
                 return f"torre{letra}.png"
         elif tipo_objeto == "base":
-            return f"base{self._letra_tema()}.png"
+            return f"base{self._letra_de(self.faccion_estructuras)}.png"
         elif tipo_objeto == "muro":
-            return f"muro{self._letra_tema()}.png"
+            return f"muro{self._letra_de(self.faccion_estructuras)}.png"
         elif tipo_objeto in ("soldado", "tanque", "rapida"):
-            # Las unidades no cambian de imagen según el tema: el mismo
-            # soldado se ve igual sin importar la facción del defensor.
-            return f"{tipo_objeto}.png"
+            # Las unidades SÍ cambian de imagen según la facción del
+            # ATACANTE. Los archivos Medieval son los originales, sin
+            # sufijo (soldado.png); Futurista y Naturaleza usan el sufijo
+            # de su letra (soldadoF.png, soldadoN.png).
+            letra = self._letra_de(self.faccion_unidades)
+            if letra == "M":
+                return f"{tipo_objeto}.png"
+            return f"{tipo_objeto}{letra}.png"
         return None
 
     def ruta_imagen_de(self, objeto):
@@ -187,7 +198,7 @@ class TableroVisual:
         if objeto is None:
             color_fondo = (COLOR_FRANJA_LIMITE
                             if columna == COLUMNA_LIMITE_ATAQUE
-                            else self.tema["fondo"])
+                            else self.tema_estructuras["fondo"])
             self.canvas.itemconfig(rect_id, fill=color_fondo)
             return
 
@@ -195,13 +206,13 @@ class TableroVisual:
         # Esto asume que las clases se llaman Torre, Unidad, Base, Muro.
         tipo_objeto = type(objeto).__name__.lower()
         if tipo_objeto == "torre":
-            color = self.tema["torre"]
+            color = self.tema_estructuras["torre"]
         elif tipo_objeto == "base":
-            color = self.tema["base"]
+            color = self.tema_estructuras["base"]
         elif tipo_objeto == "muro":
-            color = self.tema["muro"]
+            color = self.tema_estructuras["muro"]
         else:
-            color = self.tema["unidad"]  # cualquier subclase de Unidad
+            color = self.tema_unidades["unidad"]  # cualquier subclase de Unidad
 
         ruta_imagen = self.ruta_imagen_de(objeto)
         imagen = self.cargar_imagen(ruta_imagen) if ruta_imagen else None
